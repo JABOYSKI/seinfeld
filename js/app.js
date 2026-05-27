@@ -1,6 +1,6 @@
 // Main controller — boots, routes auth vs tracker, owns app state.
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
-import { loadHabits, createHabit, updateHabit, deleteHabit, COLORS } from './habits.js';
+import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS } from './habits.js';
 import { loadCompletions, markDay, unmarkDay } from './completions.js';
 import { renderCalendar } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
@@ -121,6 +121,8 @@ function renderShell() {
 async function loadAndRenderHabits() {
   const user = getUser();
   try {
+    const fixed = await repairFutureCreatedDates(user.id);
+    if (fixed > 0) toast(`Fixed ${fixed} habit start date${fixed > 1 ? 's' : ''}.`, 'info');
     state.habits = await loadHabits(user.id);
   } catch (e) {
     toast(`Failed to load habits: ${e.message}`, 'error');
