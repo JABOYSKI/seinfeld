@@ -456,12 +456,14 @@ button { font: inherit; color: inherit; }
 .day-locked .day-num { opacity: .45; }
 
 /* ----- Conglomerate ("All") view -----
-   Each cell is a stack of vertical slices, one per habit. A slice gets its
-   habit color when done, transparent when not. The day number sits above
-   the slices with a soft shadow so it's readable on any mix of fills. */
+   Minimalist: empty days are invisible — no grey background, no border, no
+   hatched ghost for habits that didn't exist yet. Only completed slices
+   show. The day number stays visible but dims to a faint hint when the
+   cell has no fills, so the eye can still locate dates without the calendar
+   becoming a wall of grey boxes. */
 .day-all {
-  /* div, not button — read-only in this view */
-  background: var(--day-empty-bg);
+  background: transparent;
+  border-color: transparent;
   cursor: default;
   overflow: hidden;
 }
@@ -479,46 +481,38 @@ button { font: inherit; color: inherit; }
 .day-slice-done {
   background: var(--c);
 }
-.day-slice-pre {
-  /* habit didn't exist yet — show a faint hatching tinted with its color so
-     the eye still groups the slice with the habit, but knows it's inert */
-  background: repeating-linear-gradient(
-    45deg,
-    color-mix(in srgb, var(--c) 18%, transparent) 0 3px,
-    transparent 3px 6px
-  );
-}
+/* Pre-creation slices intentionally invisible — no ghost, no hatching. */
+
 .day-all .day-num {
-  /* readable on any underlying mix of habit colors */
+  /* Empty default: faint, so the cell reads as nearly invisible */
+  color: var(--text-faint);
+  font-weight: 500;
+  opacity: 0.45;
+  transition: color .12s, opacity .12s, text-shadow .12s, font-weight .12s;
+}
+.day-all.has-fill .day-num {
+  /* Cell has at least one done slice → number pops with shadow for legibility */
   color: rgba(255, 255, 255, 0.96);
   font-weight: 700;
+  opacity: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-  mix-blend-mode: normal;
 }
-[data-theme="light"] .day-all .day-num {
+[data-theme="light"] .day-all.has-fill .day-num {
   color: #fff;
-  text-shadow: 0 1px 1px rgba(0,0,0,0.55), 0 0 3px rgba(0,0,0,0.35);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.65), 0 0 3px rgba(0, 0, 0, 0.4);
 }
-.day-all.day-pre {
-  background: var(--day-pre-bg);
-}
-.day-all.day-pre .day-num { color: var(--text-faint); text-shadow: none; }
 
-.day-all.day-future {
-  background: transparent;
-  border-color: var(--border-light);
-}
-.day-all.day-future .day-num { color: var(--text-faint); text-shadow: none; opacity: .3; }
+.day-all.day-future .day-num { opacity: 0.18; }
 .day-all.day-future .day-slices { display: none; }
 
 /* Perfect day: every existing habit was completed. Subtle highlight outline
    so the user can scan the year for these without them screaming. */
 .day-all.day-perfect {
-  outline: 2px solid rgba(255,255,255,0.55);
+  outline: 2px solid rgba(255, 255, 255, 0.55);
   outline-offset: -3px;
 }
 [data-theme="light"] .day-all.day-perfect {
-  outline-color: rgba(0,0,0,0.35);
+  outline-color: rgba(0, 0, 0, 0.35);
 }
 .day-all.day-today {
   outline: 2px solid var(--accent);

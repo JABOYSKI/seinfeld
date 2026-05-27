@@ -133,7 +133,8 @@ function renderAllDay(iso, dayNum, habits, completionsByHabit, today) {
   if (future) classes.push('day-future');
   if (isToday) classes.push('day-today');
   if (perfect) classes.push('day-perfect');
-  if (existingCount === 0) classes.push('day-pre');
+  if (doneCount > 0) classes.push('has-fill');
+  // Note: no day-pre or empty-cell styling — empty cells render invisibly.
 
   let title;
   if (future) {
