@@ -77,7 +77,15 @@ function renderShell() {
   els.app.innerHTML = `
     <header class="app-header">
       <div class="header-row">
-        <div class="logo">📅 <span class="logo-text">Seinfeld</span></div>
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2" y="4" width="18" height="18" rx="2.5" />
+            <line x1="2" y1="9" x2="20" y2="9" />
+            <line x1="6.5" y1="2" x2="6.5" y2="6.5" />
+            <line x1="15.5" y1="2" x2="15.5" y2="6.5" />
+          </svg>
+          <span class="logo-text">Seinfeld</span>
+        </div>
         <div class="header-spacer"></div>
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>

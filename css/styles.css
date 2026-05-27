@@ -238,10 +238,14 @@ button { font: inherit; color: inherit; }
   max-width: 1200px; margin: 0 auto;
 }
 .logo {
-  font-weight: 800; font-size: 18px; letter-spacing: .2px;
-  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 900; font-size: 20px;
+  display: inline-flex; align-items: center; gap: 8px;
 }
-.logo-text { color: var(--text); }
+.logo-text {
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+}
 .header-spacer { flex: 1; }
 
 /* ----- Habit tabs ----- */
@@ -341,12 +345,37 @@ button { font: inherit; color: inherit; }
 }
 .empty-state p { margin-bottom: 16px; }
 
-/* ----- Calendar (the wall) ----- */
+/* ----- Calendar (the wall) -----
+   Each month gets the squigglevision filter individually rather than the
+   whole .calendar, so the displacement field is sized to one month — that
+   keeps the distortion looking the same at every viewport, and avoids a
+   single huge filter region that can murder GPU perf on tall mobile layouts. */
 .calendar {
   --habit-color: var(--accent);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+}
+/* SVG filter container is sized 0 so it doesn't take layout space; we just
+   need its <defs> to be present in the DOM so url(#squiggle) resolves. */
+.filter-defs {
+  position: absolute;
+  width: 0; height: 0;
+  pointer-events: none;
+}
+
+/* Inline calendar icon next to the SEINFELD title — squigglevision'd so its
+   strokes constantly redraw, very Dr. Katz. */
+.logo-icon {
+  width: 22px; height: 24px;
+  color: var(--text);
+  filter: url(#squiggle);
+  flex-shrink: 0;
+}
+
+/* Squigglevision is wobble-heavy; respect users who've asked for stillness. */
+@media (prefers-reduced-motion: reduce) {
+  .logo-icon, .logo-text { filter: none; }
 }
 @media (max-width: 900px) { .calendar { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .calendar { grid-template-columns: 1fr; gap: 14px; } }
