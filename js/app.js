@@ -230,10 +230,11 @@ async function onCalendarClick(e) {
   // Optimistic UI: flip immediately, revert on error.
   if (wasDone) {
     state.completions.delete(day);
-    cell.classList.remove('day-done');
+    cell.classList.remove('day-done', 'day-just-filled');
   } else {
     state.completions.add(day);
     cell.classList.add('day-done');
+    playFillAnimation(cell);
   }
   renderStreak(habit);
 
@@ -341,6 +342,16 @@ function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function escapeAttr(s) { return escapeHTML(s); }
+
+// Drive the .day-just-filled CSS animation. Strip the class first and force
+// a reflow so re-clicking a cell within one session restarts the animation
+// — without the reflow, re-adding the same class won't re-run keyframes.
+function playFillAnimation(cell) {
+  cell.classList.remove('day-just-filled');
+  void cell.offsetWidth;
+  cell.classList.add('day-just-filled');
+  setTimeout(() => cell.classList.remove('day-just-filled'), 650);
+}
 
 boot().catch(err => {
   console.error('Boot failed:', err);

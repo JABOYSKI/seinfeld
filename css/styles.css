@@ -411,6 +411,46 @@ button { font: inherit; color: inherit; }
 }
 .day-done:hover { filter: brightness(1.1); }
 
+/* ----- Fill animation -----
+   Triggered by JS adding .day-just-filled the moment a cell is marked. The
+   feeling we want: a confident *thunk* — spring scale-pop combined with a
+   ring of the habit color radiating outward via box-shadow, plus a quick
+   white flash on the day number so the eye locks onto the change.
+
+   z-index lifts the popping cell above its grid neighbors so the scale
+   doesn't get visually clipped at the seams. */
+@keyframes day-pop {
+  0%   { transform: scale(1); }
+  18%  { transform: scale(0.86); }
+  46%  { transform: scale(1.22); }
+  72%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+@keyframes day-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--habit-color) 75%, transparent); }
+  100% { box-shadow: 0 0 0 18px color-mix(in srgb, var(--habit-color)  0%, transparent); }
+}
+@keyframes day-flash-num {
+  0%   { color: #fff; text-shadow: 0 0 12px rgba(255,255,255,.9); transform: scale(1.15); }
+  100% { color: rgba(255,255,255,.92); text-shadow: none; transform: scale(1); }
+}
+
+.day-just-filled {
+  animation:
+    day-pop  420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    day-ring 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 3;
+}
+.day-just-filled .day-num {
+  animation: day-flash-num 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .day-just-filled,
+  .day-just-filled .day-num { animation: none; }
+}
+
 .day-today {
   outline: 2px solid var(--habit-color);
   outline-offset: 1px;
