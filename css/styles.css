@@ -300,6 +300,13 @@ button { font: inherit; color: inherit; }
   font-weight: 700; font-size: 16px;
   padding: 6px 12px;
 }
+.tab-all { --tab-color: var(--text-dim); }
+.tab-all .tab-all-icon {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.tab-all.tab-active { --tab-color: var(--text); }
+.tab-all.tab-active .tab-all-icon { color: var(--text); }
 
 /* ----- Tracker / year bar ----- */
 .tracker {
@@ -447,6 +454,80 @@ button { font: inherit; color: inherit; }
   cursor: not-allowed;
 }
 .day-locked .day-num { opacity: .45; }
+
+/* ----- Conglomerate ("All") view -----
+   Each cell is a stack of vertical slices, one per habit. A slice gets its
+   habit color when done, transparent when not. The day number sits above
+   the slices with a soft shadow so it's readable on any mix of fills. */
+.day-all {
+  /* div, not button — read-only in this view */
+  background: var(--day-empty-bg);
+  cursor: default;
+  overflow: hidden;
+}
+.day-slices {
+  position: absolute; inset: 0;
+  display: flex;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.day-slice {
+  flex: 1;
+  background: transparent;
+  transition: background .15s;
+}
+.day-slice-done {
+  background: var(--c);
+}
+.day-slice-pre {
+  /* habit didn't exist yet — show a faint hatching tinted with its color so
+     the eye still groups the slice with the habit, but knows it's inert */
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--c) 18%, transparent) 0 3px,
+    transparent 3px 6px
+  );
+}
+.day-all .day-num {
+  /* readable on any underlying mix of habit colors */
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  mix-blend-mode: normal;
+}
+[data-theme="light"] .day-all .day-num {
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.55), 0 0 3px rgba(0,0,0,0.35);
+}
+.day-all.day-pre {
+  background: var(--day-pre-bg);
+}
+.day-all.day-pre .day-num { color: var(--text-faint); text-shadow: none; }
+
+.day-all.day-future {
+  background: transparent;
+  border-color: var(--border-light);
+}
+.day-all.day-future .day-num { color: var(--text-faint); text-shadow: none; opacity: .3; }
+.day-all.day-future .day-slices { display: none; }
+
+/* Perfect day: every existing habit was completed. Subtle highlight outline
+   so the user can scan the year for these without them screaming. */
+.day-all.day-perfect {
+  outline: 2px solid rgba(255,255,255,0.55);
+  outline-offset: -3px;
+}
+[data-theme="light"] .day-all.day-perfect {
+  outline-color: rgba(0,0,0,0.35);
+}
+.day-all.day-today {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Tighter gap between months in the All view so the year reads as a single
+   contiguous wall, not a grid of cards. */
+.calendar.calendar-all { gap: 14px; }
 
 /* ----- Overlay / dialog ----- */
 .overlay {

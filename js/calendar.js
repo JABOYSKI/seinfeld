@@ -1,43 +1,75 @@
-// Renders the 12-month wall calendar grid for one habit + one year.
+// Renders the 12-month wall calendar grid.
+//   - renderCalendar(): single-habit view (one color).
+//   - renderAllCalendar(): conglomerate view, each day cell split into N
+//     slices (one per habit). Read-only — to mark a day, switch to that
+//     habit's tab.
 import {
   MONTH_SHORT, WEEKDAY_LETTERS,
   daysInMonth, firstWeekdayOfMonth,
-  toISO, todayISO, canEditDay, daysBetween,
+  todayISO, canEditDay, daysBetween,
 } from './utils.js';
 
-// Build the full year grid as a single string of HTML, then inject. Cheaper
-// than 365+ DOM appends.
+// ----- Single-habit (existing) view ---------------------------------------
+
 export function renderCalendar(container, habit, completions, year) {
   const today = todayISO();
-  const habitCreated = habit.created_at; // 'YYYY-MM-DD'
+  const habitCreated = habit.created_at;
 
   let html = '';
   for (let m = 0; m < 12; m++) {
-    html += renderMonth(m, year, habit, completions, today, habitCreated);
+    html += renderMonth(m, year, (cells) => cells.map(({ iso, dayNum }) =>
+      renderDay(iso, dayNum, habit, completions, today, habitCreated)
+    ).join(''));
   }
 
   container.innerHTML = html;
   container.style.setProperty('--habit-color', habit.color);
+  container.classList.remove('calendar-all');
 }
 
-function renderMonth(month, year, habit, completions, today, habitCreated) {
-  const dim = daysInMonth(year, month);
-  const first = firstWeekdayOfMonth(year, month); // 0=Sun
+// ----- Conglomerate view --------------------------------------------------
+//
+// habits: array of habit objects
+// completionsByHabit: Map<habitId, Set<'YYYY-MM-DD'>>
+export function renderAllCalendar(container, habits, completionsByHabit, year) {
+  const today = todayISO();
 
-  let cells = '';
-
-  // Blank leading cells so day-1 lines up under the correct weekday column.
-  for (let i = 0; i < first; i++) cells += `<div class="day day-blank"></div>`;
-
-  for (let d = 1; d <= dim; d++) {
-    const iso = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    cells += renderDay(iso, d, habit, completions, today, habitCreated);
+  let html = '';
+  for (let m = 0; m < 12; m++) {
+    html += renderMonth(m, year, (cells) => cells.map(({ iso, dayNum }) =>
+      renderAllDay(iso, dayNum, habits, completionsByHabit, today)
+    ).join(''));
   }
 
-  // Tail blanks to fill the last row so the next month's grid lines align.
+  container.innerHTML = html;
+  // Use the first habit's color as the --habit-color fallback (for hover etc).
+  container.style.setProperty('--habit-color', habits[0]?.color || 'var(--accent)');
+  container.classList.add('calendar-all');
+}
+
+// ----- Shared month scaffolding -------------------------------------------
+
+// `renderCells` is a function that takes an array of { iso, dayNum } and
+// returns the joined HTML string for the day buttons. Lets us reuse the
+// month chrome (header, weekdays, blank leaders/tails) across both views.
+function renderMonth(month, year, renderCells) {
+  const dim = daysInMonth(year, month);
+  const first = firstWeekdayOfMonth(year, month);
+
+  let leading = '';
+  for (let i = 0; i < first; i++) leading += `<div class="day day-blank"></div>`;
+
+  const cellData = [];
+  for (let d = 1; d <= dim; d++) {
+    const iso = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cellData.push({ iso, dayNum: d });
+  }
+  const cells = renderCells(cellData);
+
   const used = first + dim;
   const tail = (7 - (used % 7)) % 7;
-  for (let i = 0; i < tail; i++) cells += `<div class="day day-blank"></div>`;
+  let trailing = '';
+  for (let i = 0; i < tail; i++) trailing += `<div class="day day-blank"></div>`;
 
   return `
     <div class="month">
@@ -45,7 +77,7 @@ function renderMonth(month, year, habit, completions, today, habitCreated) {
       <div class="month-weekdays">
         ${WEEKDAY_LETTERS.map(l => `<div class="wd">${l}</div>`).join('')}
       </div>
-      <div class="month-grid">${cells}</div>
+      <div class="month-grid">${leading}${cells}${trailing}</div>
     </div>
   `;
 }
@@ -74,4 +106,52 @@ function renderDay(iso, dayNum, habit, completions, today, habitCreated) {
   return `<button type="button" class="${classes.join(' ')}" data-day="${iso}" title="${title}"${editable ? '' : ' disabled'}>
     <span class="day-num">${dayNum}</span>
   </button>`;
+}
+
+// In conglomerate mode each cell is a stack of N vertical slices. A slice is
+// either filled with its habit color (done that day) or empty. We also dim
+// slices for habits that didn't exist yet on that day, so the user can see
+// at a glance "this day is half empty because half my habits are newer".
+function renderAllDay(iso, dayNum, habits, completionsByHabit, today) {
+  const future = daysBetween(today, iso) > 0;
+  const isToday = iso === today;
+
+  // Count fills + count habits that existed → drives the "perfect day" outline
+  let doneCount = 0;
+  let existingCount = 0;
+  const slices = habits.map(h => {
+    const existed = daysBetween(h.created_at, iso) >= 0;
+    const done = !future && existed && completionsByHabit.get(h.id)?.has(iso);
+    if (existed) existingCount++;
+    if (done) doneCount++;
+    return { habit: h, existed, done };
+  });
+
+  const perfect = existingCount > 0 && doneCount === existingCount;
+
+  const classes = ['day', 'day-all'];
+  if (future) classes.push('day-future');
+  if (isToday) classes.push('day-today');
+  if (perfect) classes.push('day-perfect');
+  if (existingCount === 0) classes.push('day-pre');
+
+  let title;
+  if (future) {
+    title = `${iso} — in the future`;
+  } else if (existingCount === 0) {
+    title = `${iso} — no habits existed yet`;
+  } else {
+    const doneNames = slices.filter(s => s.done).map(s => s.habit.name);
+    title = `${iso} — ${doneCount}/${existingCount} habits`;
+    if (doneNames.length) title += `\n${doneNames.join(', ')}`;
+  }
+
+  const slicesHTML = slices.map(s =>
+    `<span class="day-slice${s.done ? ' day-slice-done' : ''}${s.existed ? '' : ' day-slice-pre'}" style="--c:${s.habit.color}"></span>`
+  ).join('');
+
+  return `<div class="${classes.join(' ')}" data-day="${iso}" title="${title}">
+    <span class="day-slices">${slicesHTML}</span>
+    <span class="day-num">${dayNum}</span>
+  </div>`;
 }

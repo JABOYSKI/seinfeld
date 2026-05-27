@@ -2,7 +2,7 @@
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
 import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS } from './habits.js';
 import { loadCompletions, markDay, unmarkDay } from './completions.js';
-import { renderCalendar } from './calendar.js';
+import { renderCalendar, renderAllCalendar } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
 import { toast, todayISO, canEditDay } from './utils.js';
@@ -13,10 +13,15 @@ const MAX_HABITS = 5;
 
 const state = {
   habits: [],
+  // currentHabitId === 'all' is a sentinel for the conglomerate view; any
+  // real UUID = the single-habit view for that habit.
   currentHabitId: null,
   currentYear: new Date().getFullYear(),
-  completions: new Set(),
+  completions: new Set(),                 // single-mode: one habit's completions
+  completionsByHabit: new Map(),          // all-mode: habitId -> Set<dayISO>
 };
+
+const ALL_VIEW_ID = 'all';
 
 const els = {
   boot: document.getElementById('bootSplash'),
@@ -145,7 +150,8 @@ async function loadAndRenderHabits() {
   }
 
   els.emptyState.hidden = true;
-  if (!state.habits.find(h => h.id === state.currentHabitId)) {
+  // Preserve a valid current selection: ALL_VIEW_ID is valid, or any real habit id.
+  if (state.currentHabitId !== ALL_VIEW_ID && !state.habits.find(h => h.id === state.currentHabitId)) {
     state.currentHabitId = state.habits[0].id;
   }
   renderTabs();
@@ -153,6 +159,17 @@ async function loadAndRenderHabits() {
 }
 
 function renderTabs() {
+  // 'All' tab is only useful when there are 2+ habits. With just one habit
+  // the conglomerate view is identical to the single-habit view.
+  const showAllTab = state.habits.length >= 2;
+  const allTab = showAllTab
+    ? `<button class="tab tab-all ${state.currentHabitId === ALL_VIEW_ID ? 'tab-active' : ''}"
+               data-habit="${ALL_VIEW_ID}" title="See every habit at once">
+         <span class="tab-all-icon">▦</span>
+         <span class="tab-name">All</span>
+       </button>`
+    : '';
+
   const tabs = state.habits.map(h => `
     <button class="tab ${h.id === state.currentHabitId ? 'tab-active' : ''}"
             data-habit="${h.id}"
@@ -166,7 +183,7 @@ function renderTabs() {
   const addBtn = canAdd
     ? `<button class="tab tab-add" id="tabAdd" title="New habit">+</button>`
     : '';
-  els.tabs.innerHTML = tabs + addBtn;
+  els.tabs.innerHTML = allTab + tabs + addBtn;
 
   els.tabs.querySelectorAll('.tab[data-habit]').forEach(t => {
     t.addEventListener('click', (e) => {
@@ -190,6 +207,10 @@ function renderTabs() {
 }
 
 async function loadAndRenderCalendar() {
+  if (state.currentHabitId === ALL_VIEW_ID) {
+    await loadAndRenderAllCalendar();
+    return;
+  }
   const habit = state.habits.find(h => h.id === state.currentHabitId);
   if (!habit) return;
   try {
@@ -202,6 +223,23 @@ async function loadAndRenderCalendar() {
   renderStreak(habit);
 }
 
+async function loadAndRenderAllCalendar() {
+  // Fire all per-habit fetches in parallel — small N (max 5) keeps this cheap.
+  try {
+    const results = await Promise.all(
+      state.habits.map(h =>
+        loadCompletions(h.id, state.currentYear).then(set => [h.id, set])
+      )
+    );
+    state.completionsByHabit = new Map(results);
+  } catch (e) {
+    toast(`Failed to load days: ${e.message}`, 'error');
+    state.completionsByHabit = new Map();
+  }
+  renderAllCalendar(els.calendar, state.habits, state.completionsByHabit, state.currentYear);
+  renderAllSummary();
+}
+
 function renderStreak(habit) {
   // For accurate current-streak math we need completions for the prior year
   // too (a chain can cross New Year). Cheap follow-up fetch only when the
@@ -212,6 +250,41 @@ function renderStreak(habit) {
     <span class="streak-current">current <b>${cur}</b></span>
     <span class="streak-sep">·</span>
     <span class="streak-longest">longest <b>${longest}</b></span>
+  `;
+}
+
+function renderAllSummary() {
+  // "Perfect days" = days where every habit that existed by that date got
+  // its slice filled. Most useful metric in the conglomerate view because it
+  // rewards consistency across the whole portfolio.
+  const today = todayISO();
+  const year = state.currentYear;
+  let perfectDays = 0;
+  let totalFills = 0;
+  for (const [, set] of state.completionsByHabit) totalFills += set.size;
+
+  // Walk each day from year start to today (or year end) counting perfect days.
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd   = new Date(year, 11, 31);
+  const stop      = todayISO() < `${year}-01-01` ? yearStart
+                  : todayISO() > `${year}-12-31` ? yearEnd
+                  : new Date();
+  for (let d = new Date(yearStart); d <= stop; d.setDate(d.getDate() + 1)) {
+    const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    let existing = 0, done = 0;
+    for (const h of state.habits) {
+      if (h.created_at <= iso) {
+        existing++;
+        if (state.completionsByHabit.get(h.id)?.has(iso)) done++;
+      }
+    }
+    if (existing > 0 && done === existing) perfectDays++;
+  }
+
+  els.streakChip.innerHTML = `
+    <span class="streak-current">perfect days <b>${perfectDays}</b></span>
+    <span class="streak-sep">·</span>
+    <span class="streak-longest">total fills <b>${totalFills}</b></span>
   `;
 }
 
