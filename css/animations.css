@@ -426,3 +426,94 @@
   [class*="fill-"]::after,
   .day-just-filled .day-num { animation: none !important; }
 }
+
+/* ===========================================================================
+   Chain-build feedback — see js/chainBuild.js
+   ===========================================================================
+   Layered on top of the per-cell fill animation when extending a streak.
+   Three pieces:
+     1. .chain-floater — "+N" number floats up from today's cell
+     2. .chain-pulse   — cascade of brief pulses rolling up to today
+     3. .toast-milestone — celebratory toast at chain anniversaries
+   --------------------------------------------------------------------------- */
+
+@keyframes chain-floater {
+  0%   { transform: translate(-50%, 4px)  scale(0.5); opacity: 0; }
+  18%  { transform: translate(-50%, -6px)  scale(1.45); opacity: 1; }
+  70%  { transform: translate(-50%, -32px) scale(1);    opacity: 1; }
+  100% { transform: translate(-50%, -56px) scale(0.7);  opacity: 0; }
+}
+.chain-floater {
+  position: absolute;
+  top: -2px; left: 50%;
+  pointer-events: none;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: var(--floater-color);
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.55),
+    0 0 8px color-mix(in srgb, var(--floater-color) 60%, transparent);
+  white-space: nowrap;
+  z-index: 20;
+  animation: chain-floater 1050ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes chain-pulse {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0  transparent; }
+  45%  { transform: scale(1.16); box-shadow: 0 0 12px 2px var(--pulse-color); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0  transparent; }
+}
+.chain-pulse {
+  animation: chain-pulse 460ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 4;
+}
+
+@keyframes milestone-in {
+  0%   { transform: translateY(20px) scale(0.7); opacity: 0; }
+  60%  { transform: translateY(-4px) scale(1.08); opacity: 1; }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+.toast-milestone {
+  background: var(--bg-elev);
+  border: 2px solid var(--milestone-color);
+  padding: 14px 22px;
+  display: flex; align-items: center; gap: 14px;
+  color: var(--text);
+  box-shadow:
+    0 6px 26px color-mix(in srgb, var(--milestone-color) 30%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--milestone-color) 10%, transparent);
+  pointer-events: auto;
+  font-weight: 700;
+  border-radius: 10px;
+}
+.toast-milestone.show {
+  animation: milestone-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.milestone-num {
+  font-size: 34px;
+  color: var(--milestone-color);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.milestone-meta {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.milestone-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--text);
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.milestone-habit {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chain-floater, .chain-pulse, .toast-milestone.show { animation: none !important; }
+}

@@ -4,10 +4,12 @@ import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedD
 import { loadCompletions, markDay, unmarkDay } from './completions.js';
 import { renderCalendar, renderAllCalendar } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
+
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
 import { toast, todayISO, canEditDay } from './utils.js';
 import { getSelectedAnimationId, FILL_ANIMATION_DURATION_MS } from './fillAnimations.js';
 import { openAnimationPicker } from './animationPicker.js';
+import { playChainAnimation } from './chainBuild.js';
 
 const MAX_HABITS = 5;
 
@@ -324,6 +326,12 @@ async function onCalendarClick(e) {
     state.completions.add(day);
     cell.classList.add('day-done');
     playFillAnimation(cell);
+    // Chain-build feedback: only when filling today, since backfilling past
+    // days isn't a real-time "I just did it" moment worth celebrating.
+    if (day === todayISO()) {
+      const streak = currentStreak(state.completions, habit.created_at);
+      playChainAnimation(els.calendar, streak, habit);
+    }
   }
   renderStreak(habit);
 
