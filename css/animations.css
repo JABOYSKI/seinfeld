@@ -1,0 +1,428 @@
+/* ===========================================================================
+   25 fill animations for the wall-calendar cell.
+   ---------------------------------------------------------------------------
+   Each animation is a single class .fill-<id> that gets added (alongside
+   .day-just-filled, which carries the day-num flash) the moment a cell is
+   marked. JS strips and re-adds the class to restart the keyframes.
+
+   Conventions used throughout:
+   - z-index:3 lifts the popping cell above its grid neighbors so scale and
+     box-shadow don't get clipped by the seam between months.
+   - color-mix(... 0%, transparent) is how we fade box-shadow rings to nothing
+     while keeping the var(--habit-color) hue at the start.
+   - Overlays use ::after positioned absolutely, fading opacity to 0 at the
+     end of the keyframes so they don't permanently mask the solid bg.
+   - .day-num has position:relative z-index:1 (set in styles.css) so it always
+     paints above ::after overlays.
+   =========================================================================== */
+
+/* ---- 1. STAMP — spring pop + radiating ring (default) ---- */
+@keyframes f-stamp-pop {
+  0%   { transform: scale(1); }
+  18%  { transform: scale(0.86); }
+  46%  { transform: scale(1.22); }
+  72%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+@keyframes f-stamp-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--habit-color) 75%, transparent); }
+  100% { box-shadow: 0 0 0 18px color-mix(in srgb, var(--habit-color) 0%, transparent); }
+}
+.fill-stamp {
+  animation: f-stamp-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+             f-stamp-ring 600ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 3;
+}
+
+/* ---- 2. KICK — sharper, faster, tighter ---- */
+@keyframes f-kick-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.35); }
+  70%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@keyframes f-kick-ring {
+  0%   { box-shadow: 0 0 0 0 var(--habit-color); }
+  100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--habit-color) 0%, transparent); }
+}
+.fill-kick {
+  animation: f-kick-pop 280ms cubic-bezier(0.34, 1.8, 0.64, 1),
+             f-kick-ring 360ms ease-out;
+  z-index: 3;
+}
+
+/* ---- 3. SOFT-STAMP — gentle, slow exhale ---- */
+@keyframes f-soft-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(0.96); }
+  65%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes f-soft-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--habit-color) 50%, transparent); }
+  100% { box-shadow: 0 0 0 26px color-mix(in srgb, var(--habit-color) 0%, transparent); }
+}
+.fill-soft-stamp {
+  animation: f-soft-pop 700ms cubic-bezier(0.4, 0, 0.2, 1),
+             f-soft-ring 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 3;
+}
+
+/* ---- 4. DOUBLE-STAMP — bounce, settle, bounce again ---- */
+@keyframes f-dbl-pop {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(1.18); }
+  35%  { transform: scale(0.95); }
+  55%  { transform: scale(1.12); }
+  80%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+@keyframes f-dbl-ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--habit-color) 65%, transparent); }
+  35%  { box-shadow: 0 0 0 10px color-mix(in srgb, var(--habit-color) 0%, transparent); }
+  55%  { box-shadow: 0 0 0 0 color-mix(in srgb, var(--habit-color) 65%, transparent); }
+  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--habit-color) 0%, transparent); }
+}
+.fill-double-stamp {
+  animation: f-dbl-pop 720ms cubic-bezier(0.34, 1.56, 0.64, 1),
+             f-dbl-ring 800ms ease-out;
+  z-index: 3;
+}
+
+/* ---- 5. KNOCK — slight tilt + bounce ---- */
+@keyframes f-knock {
+  0%   { transform: scale(1) rotate(0); }
+  25%  { transform: scale(0.94) rotate(-5deg); }
+  50%  { transform: scale(1.14) rotate(4deg); }
+  75%  { transform: scale(0.98) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+.fill-knock {
+  animation: f-knock 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 3;
+}
+
+/* ---- 6. RIPPLE — single soft ring expansion ---- */
+.fill-ripple { position: relative; z-index: 3; }
+.fill-ripple::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  border: 2px solid var(--habit-color);
+  pointer-events: none;
+  animation: f-ripple 720ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes f-ripple {
+  0%   { transform: scale(1);   opacity: 0.85; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* ---- 7. SONAR — two staggered rings ---- */
+.fill-sonar { position: relative; z-index: 3; }
+.fill-sonar::before,
+.fill-sonar::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  border: 2px solid var(--habit-color);
+  pointer-events: none;
+}
+.fill-sonar::before { animation: f-sonar 750ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.fill-sonar::after  { animation: f-sonar 750ms 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@keyframes f-sonar {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* ---- 8. ECHO — three rings (two pseudo + box-shadow on element) ---- */
+.fill-echo {
+  position: relative; z-index: 3;
+  animation: f-echo-shadow 850ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.fill-echo::before,
+.fill-echo::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  border: 2px solid var(--habit-color);
+  pointer-events: none;
+}
+.fill-echo::before { animation: f-echo 850ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.fill-echo::after  { animation: f-echo 850ms 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@keyframes f-echo {
+  0%   { transform: scale(1);   opacity: 0.85; }
+  100% { transform: scale(2.9); opacity: 0; }
+}
+@keyframes f-echo-shadow {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--habit-color) 55%, transparent); }
+  100% { box-shadow: 0 0 0 14px color-mix(in srgb, var(--habit-color) 0%, transparent); }
+}
+
+/* ---- 9. BLOOM — radial gradient explodes outward like ink in water ---- */
+.fill-bloom { position: relative; z-index: 3; overflow: visible; }
+.fill-bloom::after {
+  content: ''; position: absolute; inset: -75%;
+  background: radial-gradient(circle, var(--habit-color) 0%, transparent 55%);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: f-bloom 760ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes f-bloom {
+  0%   { transform: scale(0); opacity: 1; }
+  60%  { opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* ---- 10. BURST — quick radial flare ---- */
+.fill-burst {
+  animation: f-burst 400ms ease-out;
+  z-index: 3;
+}
+@keyframes f-burst {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--habit-color) 90%, transparent); transform: scale(1); }
+  50%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--habit-color) 0%, transparent); transform: scale(1.15); }
+  100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
+}
+
+/* ---- 11. FADE — gentle opacity + scale + blur ---- */
+.fill-fade {
+  animation: f-fade 620ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+}
+@keyframes f-fade {
+  0%   { opacity: 0; transform: scale(0.7); filter: blur(3px); }
+  100% { opacity: 1; transform: scale(1);   filter: blur(0); }
+}
+
+/* ---- 12. WIPE — color sweeps in from the left ---- */
+.fill-wipe { position: relative; z-index: 3; }
+.fill-wipe::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--habit-color);
+  pointer-events: none;
+  animation: f-wipe 520ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes f-wipe {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 1; }
+  80%  { clip-path: inset(0 0 0 0);    opacity: 1; }
+  100% { clip-path: inset(0 0 0 0);    opacity: 0; }
+}
+
+/* ---- 13. DIAGONAL — color sweeps from top-left corner ---- */
+.fill-diagonal { position: relative; z-index: 3; }
+.fill-diagonal::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--habit-color);
+  pointer-events: none;
+  animation: f-diagonal 540ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes f-diagonal {
+  0%   { clip-path: polygon(0 0, 0 0, 0 0); opacity: 1; }
+  55%  { clip-path: polygon(0 0, 100% 0, 0 100%); opacity: 1; }
+  80%  { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 1; }
+  100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 0; }
+}
+
+/* ---- 14. IRIS — circle expands from center ---- */
+.fill-iris { position: relative; z-index: 3; }
+.fill-iris::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--habit-color);
+  pointer-events: none;
+  animation: f-iris 520ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes f-iris {
+  0%   { clip-path: circle(0%  at 50% 50%); opacity: 1; }
+  80%  { clip-path: circle(85% at 50% 50%); opacity: 1; }
+  100% { clip-path: circle(85% at 50% 50%); opacity: 0; }
+}
+
+/* ---- 15. RISE — color fills from bottom up like a beaker ---- */
+.fill-rise { position: relative; z-index: 3; }
+.fill-rise::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--habit-color);
+  pointer-events: none;
+  animation: f-rise 620ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes f-rise {
+  0%   { clip-path: inset(100% 0 0 0); opacity: 1; }
+  80%  { clip-path: inset(0 0 0 0);    opacity: 1; }
+  100% { clip-path: inset(0 0 0 0);    opacity: 0; }
+}
+
+/* ---- 16. DRIP — color falls from top down ---- */
+.fill-drip { position: relative; z-index: 3; }
+.fill-drip::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--habit-color);
+  pointer-events: none;
+  animation: f-drip 620ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes f-drip {
+  0%   { clip-path: inset(0 0 100% 0); opacity: 1; }
+  80%  { clip-path: inset(0 0 0 0);    opacity: 1; }
+  100% { clip-path: inset(0 0 0 0);    opacity: 0; }
+}
+
+/* ---- 17. POP — pure scale spring, no ring ---- */
+@keyframes f-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.32); }
+  100% { transform: scale(1); }
+}
+.fill-pop {
+  animation: f-pop 400ms cubic-bezier(0.34, 1.8, 0.64, 1);
+  z-index: 3;
+}
+
+/* ---- 18. JELLY — wobbly multi-axis squash ---- */
+@keyframes f-jelly {
+  0%   { transform: scale(1, 1); }
+  20%  { transform: scale(1.25, 0.8); }
+  40%  { transform: scale(0.85, 1.18); }
+  55%  { transform: scale(1.1, 0.93); }
+  70%  { transform: scale(0.97, 1.05); }
+  100% { transform: scale(1, 1); }
+}
+.fill-jelly {
+  animation: f-jelly 720ms ease-out;
+  z-index: 3;
+}
+
+/* ---- 19. BUBBLE — scale + slight bob, like surfacing ---- */
+@keyframes f-bubble {
+  0%   { transform: scale(1) translateY(0); }
+  40%  { transform: scale(1.22) translateY(-1px); }
+  60%  { transform: scale(0.95) translateY(-3px); }
+  80%  { transform: scale(1.04) translateY(0); }
+  100% { transform: scale(1) translateY(0); }
+}
+.fill-bubble {
+  animation: f-bubble 620ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 3;
+}
+
+/* ---- 20. FLIP — 3D Y-axis rotation revealing colored side ---- */
+@keyframes f-flip {
+  0%   { transform: perspective(80px) rotateY(0); }
+  100% { transform: perspective(80px) rotateY(360deg); }
+}
+.fill-flip {
+  animation: f-flip 520ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+  backface-visibility: hidden;
+}
+
+/* ---- 21. FOLD — origami unfold from center ---- */
+.fill-fold { position: relative; z-index: 3; }
+.fill-fold::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--habit-color);
+  pointer-events: none;
+  animation: f-fold 600ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+@keyframes f-fold {
+  0%   { clip-path: polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%); opacity: 1; }
+  80%  { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 1; }
+  100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity: 0; }
+}
+
+/* ---- 22. GLOW — brightness pulse + halo ---- */
+@keyframes f-glow {
+  0%   { filter: brightness(1);   box-shadow: 0 0 0 0 transparent; }
+  40%  { filter: brightness(1.7); box-shadow: 0 0 18px 4px color-mix(in srgb, var(--habit-color) 75%, transparent); }
+  100% { filter: brightness(1);   box-shadow: 0 0 0 0 transparent; }
+}
+.fill-glow {
+  animation: f-glow 720ms ease-out;
+  z-index: 3;
+}
+
+/* ---- 23. SHIMMER — diagonal light streak across the surface ---- */
+.fill-shimmer {
+  background-image: linear-gradient(120deg,
+    var(--habit-color) 0%,
+    var(--habit-color) 35%,
+    rgba(255,255,255,0.55) 50%,
+    var(--habit-color) 65%,
+    var(--habit-color) 100%);
+  background-size: 300% 100%;
+  background-color: var(--habit-color);
+  animation: f-shimmer 720ms ease-out;
+  z-index: 3;
+}
+@keyframes f-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ---- 24. SPARKLE — small twinkles around the cell via box-shadow ---- */
+.fill-sparkle {
+  position: relative; z-index: 3;
+  animation: f-sparkle-bg 420ms ease-out;
+}
+.fill-sparkle::before,
+.fill-sparkle::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 3px; height: 3px; border-radius: 50%;
+  background: var(--habit-color); pointer-events: none;
+  margin: -1.5px 0 0 -1.5px;
+}
+.fill-sparkle::before {
+  /* Top + sides — 6 sparkles via stacked box-shadow */
+  box-shadow:
+    -16px -10px 0 0 var(--habit-color),
+     18px -12px 0 -0.5px var(--habit-color),
+    -12px  16px 0 -0.5px var(--habit-color),
+     16px  14px 0 0 var(--habit-color),
+      0px -22px 0 -1px var(--habit-color),
+    -22px   4px 0 -1px var(--habit-color);
+  animation: f-sparkle 650ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.fill-sparkle::after {
+  /* A second offset set so the twinkles feel scattered, not uniform */
+  box-shadow:
+     22px   2px 0 -1px var(--habit-color),
+     -8px -18px 0 -1px var(--habit-color),
+      8px  20px 0 -0.5px var(--habit-color),
+    -20px -16px 0 -1px var(--habit-color),
+     20px -20px 0 -1.5px var(--habit-color);
+  animation: f-sparkle 650ms 120ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes f-sparkle {
+  0%   { transform: scale(0);   opacity: 1; }
+  50%  { transform: scale(1.4); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+@keyframes f-sparkle-bg {
+  0%   { transform: scale(0.92); }
+  50%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* ---- 25. SNAP — quick rotation + brightness flash ---- */
+@keyframes f-snap {
+  0%   { transform: rotate(0)        scale(1);   filter: brightness(1); }
+  30%  { transform: rotate(-160deg)  scale(1.28); filter: brightness(1.9); }
+  60%  { transform: rotate(-330deg)  scale(0.96); filter: brightness(1.2); }
+  100% { transform: rotate(-360deg)  scale(1);   filter: brightness(1); }
+}
+.fill-snap {
+  animation: f-snap 380ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+}
+
+/* ---------------------------------------------------------------------------
+   Universal: the day-number flash. Applied to every animation alongside the
+   chosen fill class so the number flares white briefly, drawing the eye.
+   --------------------------------------------------------------------------- */
+@keyframes day-flash-num {
+  0%   { color: #fff; text-shadow: 0 0 12px rgba(255,255,255,.9); transform: scale(1.15); }
+  100% { color: rgba(255,255,255,.92); text-shadow: none; transform: scale(1); }
+}
+.day-just-filled .day-num {
+  animation: day-flash-num 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="fill-"],
+  [class*="fill-"]::before,
+  [class*="fill-"]::after,
+  .day-just-filled .day-num { animation: none !important; }
+}

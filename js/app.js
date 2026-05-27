@@ -6,6 +6,8 @@ import { renderCalendar } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
 import { toast, todayISO, canEditDay } from './utils.js';
+import { getSelectedAnimationId, FILL_ANIMATION_DURATION_MS } from './fillAnimations.js';
+import { openAnimationPicker } from './animationPicker.js';
 
 const MAX_HABITS = 5;
 
@@ -72,6 +74,7 @@ function renderShell() {
       <div class="header-row">
         <div class="logo">📅 <span class="logo-text">Seinfeld</span></div>
         <div class="header-spacer"></div>
+        <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
         <button class="icon-btn" id="signoutBtn" title="Sign out">⎋</button>
       </div>
@@ -107,6 +110,9 @@ function renderShell() {
   els.themeBtn.addEventListener('click', () => {
     toggleTheme();
     els.themeBtn.textContent = getActiveTheme() === 'dark' ? '☀️' : '🌙';
+  });
+  document.getElementById('animBtn').addEventListener('click', () => {
+    openAnimationPicker((id) => toast(`Animation: ${id}`, 'info'));
   });
   els.signoutBtn.addEventListener('click', async () => {
     await signOut();
@@ -230,7 +236,9 @@ async function onCalendarClick(e) {
   // Optimistic UI: flip immediately, revert on error.
   if (wasDone) {
     state.completions.delete(day);
+    // Strip any fill-* class along with done/flash so the cell goes inert.
     cell.classList.remove('day-done', 'day-just-filled');
+    cell.className = cell.className.replace(/\bfill-[a-z-]+\b/g, '').replace(/\s+/g, ' ').trim();
   } else {
     state.completions.add(day);
     cell.classList.add('day-done');
@@ -343,14 +351,16 @@ function escapeHTML(s) {
 }
 function escapeAttr(s) { return escapeHTML(s); }
 
-// Drive the .day-just-filled CSS animation. Strip the class first and force
-// a reflow so re-clicking a cell within one session restarts the animation
-// — without the reflow, re-adding the same class won't re-run keyframes.
+// Drive whichever fill animation the user has picked. Strip + reflow + re-add
+// so re-clicking restarts the keyframes; without the reflow, re-adding the
+// same class won't re-fire them.
 function playFillAnimation(cell) {
-  cell.classList.remove('day-just-filled');
+  const id = getSelectedAnimationId();
+  const cls = `fill-${id}`;
+  cell.classList.remove(cls, 'day-just-filled');
   void cell.offsetWidth;
-  cell.classList.add('day-just-filled');
-  setTimeout(() => cell.classList.remove('day-just-filled'), 650);
+  cell.classList.add(cls, 'day-just-filled');
+  setTimeout(() => cell.classList.remove(cls, 'day-just-filled'), FILL_ANIMATION_DURATION_MS);
 }
 
 boot().catch(err => {
