@@ -639,6 +639,41 @@ button { font: inherit; color: inherit; }
   font-size: 12px; font-weight: 700;
   flex-shrink: 0;
 }
+
+/* Chain picker preview: a row of 5 mini cells that play the chain animation
+   on hover. Each tile is wider than a fill-picker tile so the whole row fits. */
+.dialog-chain-picker { max-width: 760px; }
+.picker-grid-chain {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 680px) { .picker-grid-chain { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 440px) { .picker-grid-chain { grid-template-columns: 1fr; } }
+.chain-tile {
+  padding: 14px 10px 10px;
+  gap: 10px;
+  overflow: visible;
+}
+.chain-preview-row {
+  --habit-color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 6px;
+  position: relative;
+}
+.chain-preview-cell {
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  flex-shrink: 0;
+  position: relative;
+}
+.chain-preview-cell:last-child {
+  /* Today — slightly emphasized so previews convey "this is today" */
+  outline: 1.5px solid color-mix(in srgb, var(--accent) 65%, white);
+  outline-offset: 1px;
+}
 .picker-label {
   font-size: 11px;
   color: var(--text-dim);

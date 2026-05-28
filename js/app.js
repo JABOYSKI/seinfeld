@@ -9,6 +9,7 @@ import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
 import { toast, todayISO, canEditDay } from './utils.js';
 import { getSelectedAnimationId, FILL_ANIMATION_DURATION_MS } from './fillAnimations.js';
 import { openAnimationPicker } from './animationPicker.js';
+import { openChainPicker } from './chainPicker.js';
 import { playChainAnimation } from './chainBuild.js';
 
 const MAX_HABITS = 5;
@@ -90,6 +91,7 @@ function renderShell() {
         </div>
         <div class="header-spacer"></div>
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
+        <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
         <button class="icon-btn" id="signoutBtn" title="Sign out">⎋</button>
       </div>
@@ -127,7 +129,10 @@ function renderShell() {
     els.themeBtn.textContent = getActiveTheme() === 'dark' ? '☀️' : '🌙';
   });
   document.getElementById('animBtn').addEventListener('click', () => {
-    openAnimationPicker((id) => toast(`Animation: ${id}`, 'info'));
+    openAnimationPicker((id) => toast(`Fill: ${id}`, 'info'));
+  });
+  document.getElementById('chainAnimBtn').addEventListener('click', () => {
+    openChainPicker((id) => toast(`Chain: ${id}`, 'info'));
   });
   els.signoutBtn.addEventListener('click', async () => {
     await signOut();
