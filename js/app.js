@@ -339,7 +339,11 @@ async function onCalendarClick(e) {
     playFillAnimation(cell);
     const newStreak = currentStreak(state.completions, habit.created_at);
     if (newStreak > oldStreak && newStreak >= 2) {
-      playChainAnimation(els.calendar, newStreak, habit);
+      // Anchor on the cell that was just clicked — that's where the user's
+      // attention is and (in their mental model) the new end of the chain.
+      // The old behavior anchored on today, which felt wrong when filling
+      // yesterday with today still empty.
+      playChainAnimation(els.calendar, newStreak, habit, day, state.completions);
     }
   }
   renderStreak(habit);

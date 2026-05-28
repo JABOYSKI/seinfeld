@@ -8,9 +8,12 @@
 
 import { playChainAnimation as playSelectedChain } from './chainAnimations.js';
 
-export function playChainAnimation(calendarEl, streakLength, habit) {
+// anchorDayISO = the cell the user just filled. Animation emanates from there
+// (which usually but not always === today). completionsSet lets the cascade
+// trace only the connected filled segment behind the anchor.
+export function playChainAnimation(calendarEl, streakLength, habit, anchorDayISO, completionsSet) {
   if (streakLength < 2) return;
-  playSelectedChain(calendarEl, streakLength, habit);
+  playSelectedChain(calendarEl, streakLength, habit, anchorDayISO, completionsSet);
   if (isMilestone(streakLength)) {
     // Slight delay so the toast doesn't compete with the per-cell effect.
     setTimeout(() => showMilestoneToast(streakLength, habit.color, habit.name), 600);

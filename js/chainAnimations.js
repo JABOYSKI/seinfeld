@@ -6,7 +6,7 @@
 // they're recognisable even at streak 2 (where the chain is just 1 past cell
 // + today). The cascade richness scales up from there.
 
-import { todayISO, daysAgoISO } from './utils.js';
+import { todayISO, daysAgoISO, fromISO, toISO } from './utils.js';
 
 // ----- Registry (display order = picker tile order) -----
 
@@ -66,13 +66,28 @@ export function setSelectedChainAnimationId(id) {
 
 // ----- Public play API -----
 
-export function playChainAnimation(calendarEl, streakLength, habit) {
+// anchorDayISO = the day the user just filled (where the animation should
+// emanate from). This is "today" in the chain sense — the newest end of the
+// chain from the user's perspective — which is usually but not always the
+// calendar's current date. Falls back to today if not provided.
+//
+// completionsSet is optional; when present we only include consecutively
+// filled past cells in the cascade so the chain visual matches the actual
+// connected segment instead of pulsing empty cells next to the anchor.
+export function playChainAnimation(calendarEl, streakLength, habit, anchorDayISO, completionsSet) {
   if (streakLength < 2) return;
-  const todayCell = calendarEl.querySelector(`[data-day="${todayISO()}"]`);
-  if (!todayCell) return;
-  const chainCells = collectChainCells(calendarEl, streakLength);
+  const day = anchorDayISO || todayISO();
+  const anchorCell = calendarEl.querySelector(`[data-day="${day}"]`);
+  if (!anchorCell) return;
+  const chainCells = collectChainCellsFromAnchor(calendarEl, day, streakLength, completionsSet);
   playChainAnimationById(getSelectedChainAnimationId(), {
-    calendarEl, todayCell, chainCells, streakLength, habit,
+    calendarEl,
+    // Kept as `todayCell` so existing play functions don't need renaming —
+    // it just means "the anchor cell where the animation lands".
+    todayCell: anchorCell,
+    chainCells,
+    streakLength,
+    habit,
   });
 }
 
@@ -81,12 +96,27 @@ export function playChainAnimationById(id, ctx) {
   play(ctx);
 }
 
-function collectChainCells(calendarEl, streakLength) {
-  // Returns cells oldest → today, length = cascadeLength + 1 (today included).
+// Returns cells in time order: [oldest connected fill] → anchor.
+// Cells before the anchor are only included if they're consecutively filled
+// (no gaps). Without completionsSet we fall back to including all calendar
+// dates in the window — old behavior, for callers like the picker preview
+// that don't have a real completions set.
+function collectChainCellsFromAnchor(calendarEl, anchorDayISO, streakLength, completionsSet) {
   const len = cascadeLengthForStreak(streakLength);
   const cells = [];
+  const anchor = fromISO(anchorDayISO);
+  let broken = false;
   for (let i = len; i >= 0; i--) {
-    const cell = calendarEl.querySelector(`[data-day="${daysAgoISO(i)}"]`);
+    const d = new Date(anchor);
+    d.setDate(d.getDate() - i);
+    const iso = toISO(d);
+    if (i > 0 && completionsSet) {
+      // Walk strictly backward from the anchor; once we hit an unfilled day
+      // the chain is "broken" and we don't include anything older even if it
+      // happens to be filled.
+      if (broken || !completionsSet.has(iso)) { broken = true; continue; }
+    }
+    const cell = calendarEl.querySelector(`[data-day="${iso}"]`);
     if (cell) cells.push(cell);
   }
   return cells;
