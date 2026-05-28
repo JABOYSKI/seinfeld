@@ -24,6 +24,81 @@ export function renderCalendar(container, habit, completions, year) {
 
   container.innerHTML = html;
   container.style.setProperty('--habit-color', habit.color);
+  container.classList.remove('calendar-all', 'calendar-continuous');
+}
+
+// ----- Continuous strip view ----------------------------------------------
+//
+// 7 rows (one per weekday) × ~53 columns (one per week). The entire year
+// renders as one connected grid with no month-card boundaries. Month names
+// appear as subtle labels above the columns where each month starts.
+//
+// Uses grid-auto-flow: column so day cells flow top-to-bottom then
+// left-to-right; leading and trailing blank cells pad the first and last
+// weeks so day 1 of the year lands on the right weekday row.
+
+export function renderContinuousCalendar(container, habit, completions, year) {
+  const today = todayISO();
+  const habitCreated = habit.created_at;
+
+  const jan1 = new Date(year, 0, 1);
+  const jan1Weekday = jan1.getDay(); // 0 = Sun
+  const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+  const daysInYear = isLeap ? 366 : 365;
+
+  let cells = '';
+
+  // Leading blanks so day 1 lands in the correct weekday row of column 1.
+  for (let i = 0; i < jan1Weekday; i++) {
+    cells += `<div class="day day-blank"></div>`;
+  }
+
+  const monthStarts = []; // [{ col: 0-indexed, month: 0-indexed }]
+  let weekCol = 0;
+  let dayInWeek = jan1Weekday;
+
+  for (let dayOfYear = 0; dayOfYear < daysInYear; dayOfYear++) {
+    const d = new Date(year, 0, 1 + dayOfYear);
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (d.getDate() === 1) {
+      monthStarts.push({ col: weekCol, month: d.getMonth() });
+    }
+    cells += renderDay(iso, d.getDate(), habit, completions, today, habitCreated);
+    dayInWeek++;
+    if (dayInWeek === 7) { dayInWeek = 0; weekCol++; }
+  }
+
+  // Trailing blanks to complete the last week column.
+  if (dayInWeek > 0) {
+    for (let i = dayInWeek; i < 7; i++) {
+      cells += `<div class="day day-blank"></div>`;
+    }
+    weekCol++;
+  }
+
+  const totalCols = weekCol;
+
+  // Month labels: each spans from its start column to the next month's start.
+  // grid-column is 1-indexed in CSS.
+  let labels = '';
+  for (let i = 0; i < monthStarts.length; i++) {
+    const { col, month } = monthStarts[i];
+    const nextCol = monthStarts[i + 1]?.col ?? totalCols;
+    const span = Math.max(1, nextCol - col);
+    labels += `<span class="strip-month-label" style="grid-column: ${col + 1} / span ${span};">${MONTH_SHORT[month]}</span>`;
+  }
+
+  const weekdays = WEEKDAY_LETTERS.map(l => `<span class="strip-weekday">${l}</span>`).join('');
+
+  container.innerHTML = `
+    <div class="strip-months" style="grid-template-columns: repeat(${totalCols}, var(--strip-cell));">${labels}</div>
+    <div class="strip-body">
+      <div class="strip-weekdays">${weekdays}</div>
+      <div class="strip-grid">${cells}</div>
+    </div>
+  `;
+  container.style.setProperty('--habit-color', habit.color);
+  container.classList.add('calendar-continuous');
   container.classList.remove('calendar-all');
 }
 

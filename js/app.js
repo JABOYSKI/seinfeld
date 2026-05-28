@@ -2,7 +2,7 @@
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
 import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS } from './habits.js';
 import { loadCompletions, markDay, unmarkDay } from './completions.js';
-import { renderCalendar, renderAllCalendar } from './calendar.js';
+import { renderCalendar, renderAllCalendar, renderContinuousCalendar } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
 
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
@@ -25,6 +25,17 @@ const state = {
 };
 
 const ALL_VIEW_ID = 'all';
+
+// View mode: how the calendar lays out the year. 'months' = 3x4 grid of
+// month cards (default), 'continuous' = one wide 7-row x ~53-col strip.
+// Stored per-user as a UI preference, not synced via Supabase.
+const VIEW_STORAGE_KEY = 'seinfeld_view_mode';
+function getViewMode() {
+  return localStorage.getItem(VIEW_STORAGE_KEY) === 'continuous' ? 'continuous' : 'months';
+}
+function setViewMode(v) {
+  localStorage.setItem(VIEW_STORAGE_KEY, v);
+}
 
 const els = {
   boot: document.getElementById('bootSplash'),
@@ -103,6 +114,7 @@ function renderShell() {
         <button class="icon-btn" id="yearPrev" title="Previous year">‹</button>
         <div class="year-label" id="yearLabel">${state.currentYear}</div>
         <button class="icon-btn" id="yearNext" title="Next year">›</button>
+        <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${getViewMode() === 'months' ? '≡' : '▦'}</button>
         <div class="header-spacer"></div>
         <div class="streak-chip" id="streakChip"></div>
       </div>
@@ -140,6 +152,12 @@ function renderShell() {
   });
   els.yearPrev.addEventListener('click', () => changeYear(-1));
   els.yearNext.addEventListener('click', () => changeYear(1));
+  const viewToggle = document.getElementById('viewToggle');
+  viewToggle.addEventListener('click', () => {
+    setViewMode(getViewMode() === 'months' ? 'continuous' : 'months');
+    viewToggle.textContent = getViewMode() === 'months' ? '≡' : '▦';
+    if (state.currentHabitId) loadAndRenderCalendar();
+  });
   els.calendar.addEventListener('click', onCalendarClick);
   document.getElementById('emptyCreate').addEventListener('click', () => openHabitDialog());
 }
@@ -234,7 +252,11 @@ async function loadAndRenderCalendar() {
     toast(`Failed to load days: ${e.message}`, 'error');
     state.completions = new Set();
   }
-  renderCalendar(els.calendar, habit, state.completions, state.currentYear);
+  if (getViewMode() === 'continuous') {
+    renderContinuousCalendar(els.calendar, habit, state.completions, state.currentYear);
+  } else {
+    renderCalendar(els.calendar, habit, state.completions, state.currentYear);
+  }
   renderStreak(habit);
 }
 
