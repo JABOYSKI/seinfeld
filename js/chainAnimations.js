@@ -375,7 +375,7 @@ PLAYERS['starburst'] = (ctx) => {
 // 20. FIREWORKS — particle burst at today (count scales with streak)
 PLAYERS['fireworks'] = (ctx) => {
   const count = Math.min(6 + ctx.streakLength, 24);
-  particlesAt(ctx.todayCell, ctx.habit.color, count, { spread: 60 });
+  particlesAt(ctx.todayCell, ctx.habit.color, count, { spread: 90 });
   defaultFloater(ctx, 100);
 };
 

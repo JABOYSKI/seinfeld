@@ -328,14 +328,18 @@ async function onCalendarClick(e) {
     cell.classList.remove('day-done', 'day-just-filled');
     cell.className = cell.className.replace(/\bfill-[a-z-]+\b/g, '').replace(/\s+/g, ' ').trim();
   } else {
+    // Compute streak BEFORE adding so we can detect a chain extension. Fire
+    // the chain animation whenever the new fill extends the current streak
+    // — covers both filling today AND backfilling a past day that links
+    // yesterday's fill to today's. The animation always plays on today's
+    // cell because that's where the chain ends.
+    const oldStreak = currentStreak(state.completions, habit.created_at);
     state.completions.add(day);
     cell.classList.add('day-done');
     playFillAnimation(cell);
-    // Chain-build feedback: only when filling today, since backfilling past
-    // days isn't a real-time "I just did it" moment worth celebrating.
-    if (day === todayISO()) {
-      const streak = currentStreak(state.completions, habit.created_at);
-      playChainAnimation(els.calendar, streak, habit);
+    const newStreak = currentStreak(state.completions, habit.created_at);
+    if (newStreak > oldStreak && newStreak >= 2) {
+      playChainAnimation(els.calendar, newStreak, habit);
     }
   }
   renderStreak(habit);

@@ -460,7 +460,7 @@
 
 @keyframes chain-pulse {
   0%   { transform: scale(1);    box-shadow: 0 0 0 0  transparent; }
-  45%  { transform: scale(1.16); box-shadow: 0 0 12px 2px var(--pulse-color); }
+  45%  { transform: scale(1.22); box-shadow: 0 0 20px 5px var(--pulse-color); }
   100% { transform: scale(1);    box-shadow: 0 0 0 0  transparent; }
 }
 .chain-pulse {
@@ -534,7 +534,7 @@
 /* Glow only — box-shadow halo, no scale */
 @keyframes chain-pulse-glow {
   0%   { box-shadow: 0 0 0 0 transparent; }
-  50%  { box-shadow: 0 0 14px 3px var(--pulse-color); }
+  50%  { box-shadow: 0 0 24px 6px var(--pulse-color); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 .chain-pulse-glow {
@@ -545,8 +545,8 @@
 /* Tilt (dominos) — fall-then-recover */
 @keyframes chain-pulse-tilt {
   0%   { transform: rotate(0)        scale(1);    box-shadow: 0 0 0 0 transparent; }
-  30%  { transform: rotate(-8deg)    scale(1.05); box-shadow: 0 0 8px 1px var(--pulse-color); }
-  60%  { transform: rotate(4deg)     scale(1.05); box-shadow: 0 0 8px 1px var(--pulse-color); }
+  30%  { transform: rotate(-10deg)   scale(1.1);  box-shadow: 0 0 14px 3px var(--pulse-color); }
+  60%  { transform: rotate(6deg)     scale(1.1);  box-shadow: 0 0 14px 3px var(--pulse-color); }
   100% { transform: rotate(0)        scale(1);    box-shadow: 0 0 0 0 transparent; }
 }
 .chain-pulse-tilt {
@@ -557,8 +557,8 @@
 /* Flicker — rapid pulse-on-off twice */
 @keyframes chain-pulse-flicker {
   0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 transparent;   filter: brightness(1); }
-  20%, 60% { transform: scale(1.08); box-shadow: 0 0 6px 1px var(--pulse-color); filter: brightness(1.6); }
-  40%, 80% { transform: scale(1);    box-shadow: 0 0 0 0 transparent;   filter: brightness(0.85); }
+  20%, 60% { transform: scale(1.14); box-shadow: 0 0 12px 3px var(--pulse-color); filter: brightness(1.8); }
+  40%, 80% { transform: scale(1);    box-shadow: 0 0 0 0 transparent;   filter: brightness(0.8); }
 }
 .chain-pulse-flicker {
   animation: chain-pulse-flicker 360ms cubic-bezier(0.4, 0, 0.6, 1);
@@ -568,7 +568,7 @@
 /* Breathe — slow scale in and out */
 @keyframes chain-pulse-breathe {
   0%   { transform: scale(1);    filter: brightness(1); }
-  50%  { transform: scale(1.18); filter: brightness(1.25); box-shadow: 0 0 14px 2px var(--pulse-color); }
+  50%  { transform: scale(1.25); filter: brightness(1.3);  box-shadow: 0 0 22px 5px var(--pulse-color); }
   100% { transform: scale(1);    filter: brightness(1); box-shadow: 0 0 0 0 transparent; }
 }
 .chain-pulse-breathe {
@@ -593,7 +593,7 @@
 /* Strong glow — for "today" in glow-trail, bigger halo + brightness lift */
 @keyframes chain-pulse-glow-strong {
   0%   { box-shadow: 0 0 0 0 transparent; filter: brightness(1); }
-  45%  { box-shadow: 0 0 22px 6px var(--pulse-color); filter: brightness(1.3); }
+  45%  { box-shadow: 0 0 36px 10px var(--pulse-color); filter: brightness(1.4); }
   100% { box-shadow: 0 0 0 0 transparent; filter: brightness(1); }
 }
 .chain-pulse-glow-strong {
@@ -604,8 +604,8 @@
 /* Long glow — atmospheric, used by gentle-glow; very slow fade */
 @keyframes chain-pulse-glow-long {
   0%   { box-shadow: 0 0 0 0 transparent; }
-  30%  { box-shadow: 0 0 16px 3px color-mix(in srgb, var(--pulse-color) 60%, transparent); }
-  70%  { box-shadow: 0 0 16px 3px color-mix(in srgb, var(--pulse-color) 60%, transparent); }
+  30%  { box-shadow: 0 0 26px 6px color-mix(in srgb, var(--pulse-color) 70%, transparent); }
+  70%  { box-shadow: 0 0 26px 6px color-mix(in srgb, var(--pulse-color) 70%, transparent); }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 .chain-pulse-glow-long {
@@ -664,24 +664,24 @@
 
 /* Ring (small) — single expanding outline */
 @keyframes chain-burst-ring {
-  0%   { transform: scale(1);   opacity: 0.85; box-shadow: 0 0 0 2px var(--burst-color); }
-  100% { transform: scale(2.6); opacity: 0;    box-shadow: 0 0 0 1px transparent; }
+  0%   { transform: scale(1);   opacity: 1;    box-shadow: 0 0 0 2px var(--burst-color); }
+  100% { transform: scale(3.2); opacity: 0;    box-shadow: 0 0 0 1px transparent; }
 }
 .chain-burst-ring {
-  border: 2px solid var(--burst-color);
+  border: 3px solid var(--burst-color);
   background: transparent;
   animation: chain-burst-ring 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Shockwave — large, dramatic expanding ring with thick halo */
 @keyframes chain-shockwave {
-  0%   { transform: scale(1);   opacity: 0.9;
-         box-shadow: 0 0 0 0 var(--burst-color), 0 0 12px 4px color-mix(in srgb, var(--burst-color) 60%, transparent); }
-  100% { transform: scale(6);   opacity: 0;
+  0%   { transform: scale(1);   opacity: 1;
+         box-shadow: 0 0 0 0 var(--burst-color), 0 0 18px 6px color-mix(in srgb, var(--burst-color) 75%, transparent); }
+  100% { transform: scale(8);   opacity: 0;
          box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent; }
 }
 .chain-shockwave {
-  border: 3px solid var(--burst-color);
+  border: 4px solid var(--burst-color);
   background: transparent;
   animation: chain-shockwave 850ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -722,34 +722,35 @@
    Particles — small dots flying outward (fireworks).
    --------------------------------------------------------------------------- */
 @keyframes chain-particle {
-  0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 1; }
+  0%   { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
   100% { transform: translate(calc(-50% + var(--p-dx)), calc(-50% + var(--p-dy))) scale(0.2); opacity: 0; }
 }
 .chain-particle {
   position: absolute;
   top: 50%; left: 50%;
-  width: 5px; height: 5px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--p-color);
   pointer-events: none;
   z-index: 6;
-  animation: chain-particle 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  box-shadow: 0 0 6px var(--p-color);
+  animation: chain-particle 950ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 0 10px var(--p-color);
 }
 
 /* Confetti — colored rectangles drift up while rotating */
 @keyframes chain-confetti {
   0%   { transform: translate(-50%, -50%) rotate(0) scale(1); opacity: 1; }
-  100% { transform: translate(calc(-50% + var(--c-dx)), calc(-50% - 80px)) rotate(var(--c-rot)) scale(0.6); opacity: 0; }
+  100% { transform: translate(calc(-50% + var(--c-dx)), calc(-50% - 120px)) rotate(var(--c-rot)) scale(0.5); opacity: 0; }
 }
 .chain-confetti {
   position: absolute;
   top: 50%; left: 50%;
-  width: 5px; height: 8px;
+  width: 7px; height: 11px;
   background: var(--c-color);
   pointer-events: none;
   z-index: 6;
-  animation: chain-confetti 1300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: chain-confetti 1400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  border-radius: 1px;
 }
 
 /* ===========================================================================
