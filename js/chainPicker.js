@@ -57,12 +57,11 @@ export function openChainPicker(onSelected) {
     const play = () => {
       clearTimeout(timer);
       // Strip any leftover state from a prior play so animations restart cleanly.
+      // Regex catches every chain-* class so we don't need to update this list
+      // when new animation variants get added.
       cells.forEach(c => {
-        c.classList.remove(
-          'chain-pulse', 'chain-pulse-soft', 'chain-pulse-glow', 'chain-pulse-tilt',
-          'chain-pulse-flicker', 'chain-pulse-breathe', 'chain-shimmer',
-        );
-        c.querySelectorAll('.chain-floater, .chain-floater-mini, .chain-floater-combo, .chain-floater-fire, .chain-burst, .chain-burst-ring, .chain-shockwave, .chain-pulse-bomb, .chain-starburst, .chain-particle, .chain-confetti').forEach(n => n.remove());
+        c.className = c.className.replace(/\bchain-[a-z][\w-]*\b/g, '').replace(/\s+/g, ' ').trim();
+        c.querySelectorAll('[class*="chain-"]').forEach(n => n.remove());
       });
       // Force reflow so re-adding classes restarts keyframes.
       void row.offsetWidth;

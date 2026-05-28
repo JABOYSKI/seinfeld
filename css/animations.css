@@ -576,6 +576,60 @@
   z-index: 4;
 }
 
+/* Wave — anisotropic squash/stretch so the cell visibly distorts as the wave
+   passes through it. Distinct from "soft" pulse which is isotropic scale. */
+@keyframes chain-pulse-wave {
+  0%   { transform: scale(1, 1); }
+  25%  { transform: scale(1.25, 0.8); box-shadow: 0 0 10px 1px var(--pulse-color); }
+  50%  { transform: scale(0.85, 1.2); box-shadow: 0 0 10px 1px var(--pulse-color); }
+  75%  { transform: scale(1.08, 0.95); }
+  100% { transform: scale(1, 1); box-shadow: 0 0 0 0 transparent; }
+}
+.chain-pulse-wave {
+  animation: chain-pulse-wave 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 4;
+}
+
+/* Strong glow — for "today" in glow-trail, bigger halo + brightness lift */
+@keyframes chain-pulse-glow-strong {
+  0%   { box-shadow: 0 0 0 0 transparent; filter: brightness(1); }
+  45%  { box-shadow: 0 0 22px 6px var(--pulse-color); filter: brightness(1.3); }
+  100% { box-shadow: 0 0 0 0 transparent; filter: brightness(1); }
+}
+.chain-pulse-glow-strong {
+  animation: chain-pulse-glow-strong 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 4;
+}
+
+/* Long glow — atmospheric, used by gentle-glow; very slow fade */
+@keyframes chain-pulse-glow-long {
+  0%   { box-shadow: 0 0 0 0 transparent; }
+  30%  { box-shadow: 0 0 16px 3px color-mix(in srgb, var(--pulse-color) 60%, transparent); }
+  70%  { box-shadow: 0 0 16px 3px color-mix(in srgb, var(--pulse-color) 60%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.chain-pulse-glow-long {
+  animation: chain-pulse-glow-long 1200ms cubic-bezier(0.4, 0, 0.4, 1);
+  z-index: 4;
+}
+
+/* Bloom — radial color spread expanding from a cell, larger than burst-ring,
+   slower and softer than pulse-bomb. Used by the bloom animation. */
+@keyframes chain-bloom {
+  0%   { transform: scale(0.3); opacity: 1;
+         background: radial-gradient(circle, color-mix(in srgb, var(--burst-color) 80%, transparent) 0%, transparent 70%); }
+  60%  { transform: scale(3);   opacity: 0.5; }
+  100% { transform: scale(5);   opacity: 0; }
+}
+.chain-bloom {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 50%;
+  z-index: 5;
+  animation: chain-bloom 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Shimmer overlay — diagonal light streak via gradient sweep */
 .chain-shimmer {
   background-image: linear-gradient(120deg,

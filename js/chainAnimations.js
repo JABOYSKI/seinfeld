@@ -2,40 +2,39 @@
 // extends an existing streak; intensity scales with streak length via the
 // number of "chain cells" included in the effect.
 //
-// Architecture:
-//   - PLAYERS[id](ctx) = play function. ctx = { calendarEl, todayCell,
-//     chainCells, streakLength, habit }. chainCells goes oldest → today.
-//   - Helpers compose pulse / floater / burst / particle primitives.
-//   - Picker preview reuses the same play function via playChainAnimationById,
-//     passing synthetic preview cells in place of real day cells.
+// Design principle: every animation has a distinctive "today signature" so
+// they're recognisable even at streak 2 (where the chain is just 1 past cell
+// + today). The cascade richness scales up from there.
 
 import { todayISO, daysAgoISO } from './utils.js';
 
 // ----- Registry (display order = picker tile order) -----
 
 export const CHAIN_ANIMATIONS = [
-  // Sequential cell pulse variants
-  { id: 'cascade',      name: 'Cascade',      blurb: 'Pulse rolls forward to today' },
-  { id: 'backwash',     name: 'Backwash',     blurb: 'Pulse rolls back from today' },
-  { id: 'wave',         name: 'Wave',         blurb: 'Soft accelerating sweep' },
-  { id: 'edge-in',      name: 'Edge-in',      blurb: 'Pulses from both ends meet in middle' },
-  { id: 'center-out',   name: 'Center out',   blurb: 'Pulse spreads from chain center' },
+  // Sequential cell pulse — direction differentiates them at higher streaks,
+  // and each gets a different today signature so they read as distinct even
+  // when there's only 1 past cell.
+  { id: 'cascade',      name: 'Cascade',      blurb: 'Pulse rolls forward, ring lands on today' },
+  { id: 'backwash',     name: 'Backwash',     blurb: 'Ring at today, pulse rolls back' },
+  { id: 'wave',         name: 'Wave',         blurb: 'Squash-stretch wave propagates' },
+  { id: 'edge-in',      name: 'Edge-in',      blurb: 'Ends pulse, ring converges at today' },
+  { id: 'center-out',   name: 'Center out',   blurb: 'Center pulses, rings spread to ends' },
 
-  // Per-cell effect variants
-  { id: 'glow-trail',   name: 'Glow trail',   blurb: 'Glow sweeps without scale' },
-  { id: 'ripple-trail', name: 'Ripple trail', blurb: 'Each cell rings as it pulses' },
-  { id: 'shimmer-row',  name: 'Shimmer row',  blurb: 'Light streak sweeps the chain' },
-  { id: 'dominos',      name: 'Dominos',      blurb: 'Cells tilt in sequence' },
-  { id: 'flicker',      name: 'Flicker',      blurb: 'Rapid pulse pattern' },
+  // Per-cell effect variants — each cell gets a distinctive treatment
+  { id: 'glow-trail',   name: 'Glow trail',   blurb: 'Pure color glow, no scale' },
+  { id: 'ripple-trail', name: 'Ripple trail', blurb: 'Each cell emits a ring' },
+  { id: 'shimmer-row',  name: 'Shimmer row',  blurb: 'Light streak sweeps each cell' },
+  { id: 'dominos',      name: 'Dominos',      blurb: 'Cells tilt in sequence, today snaps' },
+  { id: 'flicker',      name: 'Flicker',      blurb: 'Rapid pulse pattern across chain' },
 
-  // All-at-once
+  // Simultaneous chain effects
   { id: 'surge',        name: 'Surge',        blurb: 'Whole chain pulses at once' },
-  { id: 'heartbeat',    name: 'Heartbeat',    blurb: 'Two quick pulses, settle' },
+  { id: 'heartbeat',    name: 'Heartbeat',    blurb: 'Two beats, then settle' },
   { id: 'breathe',      name: 'Breathe',      blurb: 'Slow scale in and out' },
-  { id: 'whisper',      name: 'Whisper',      blurb: 'Minimal subtle pulse' },
-  { id: 'gentle-glow',  name: 'Gentle glow',  blurb: 'Soft sustained glow' },
+  { id: 'bloom',        name: 'Bloom',        blurb: 'Radial color bloom from today' },
+  { id: 'gentle-glow',  name: 'Gentle glow',  blurb: 'Long, atmospheric glow' },
 
-  // Today-centric effects
+  // Today-centric effects (already distinctive at any streak)
   { id: 'echo',         name: 'Echo',         blurb: 'Rings ripple back from today' },
   { id: 'shockwave',    name: 'Shockwave',    blurb: 'Big ring expands from today' },
   { id: 'pulse-bomb',   name: 'Pulse bomb',   blurb: 'Heavy radial glow from today' },
@@ -43,7 +42,7 @@ export const CHAIN_ANIMATIONS = [
   { id: 'fireworks',    name: 'Fireworks',    blurb: 'Particle burst at today' },
   { id: 'confetti',     name: 'Confetti',     blurb: 'Colored bits fly upward' },
 
-  // Floater-driven (text/icon variants)
+  // Floater-driven
   { id: 'counter',      name: 'Counter',      blurb: 'Number ticks up at today' },
   { id: 'stack',        name: 'Stack',        blurb: '+1s rise from each cell' },
   { id: 'combo',        name: 'Combo',        blurb: '"COMBO!" text + flashes' },
@@ -93,10 +92,11 @@ function collectChainCells(calendarEl, streakLength) {
   return cells;
 }
 
-// Cascade length stays consistent across animation types — defines how many
-// cells back from today get included in the effect.
+// Cascade length = number of PAST cells included. At streak 2, this is 1
+// (yesterday). Sequential animations need at least one past cell to show
+// direction; without this, streak 2 has no cells to operate on.
 function cascadeLengthForStreak(streak) {
-  if (streak < 3)  return 0;
+  if (streak < 2)  return 0;
   if (streak < 7)  return Math.min(streak - 1, 3);
   if (streak < 14) return Math.min(streak - 1, 6);
   if (streak < 30) return Math.min(streak - 1, 10);
@@ -113,16 +113,12 @@ function floaterSize(streak) {
 // ----- Helpers -----
 
 function pulseCell(cell, color, opts = {}) {
-  const { klass = 'chain-pulse', duration = 460, glow = null, scale = null } = opts;
+  const { klass = 'chain-pulse', duration = 460 } = opts;
   cell.style.setProperty('--pulse-color', color);
-  if (glow  !== null) cell.style.setProperty('--pulse-glow', glow);
-  if (scale !== null) cell.style.setProperty('--pulse-scale', scale);
   cell.classList.add(klass);
   setTimeout(() => {
     cell.classList.remove(klass);
     cell.style.removeProperty('--pulse-color');
-    cell.style.removeProperty('--pulse-glow');
-    cell.style.removeProperty('--pulse-scale');
   }, duration + 40);
 }
 
@@ -144,8 +140,8 @@ function defaultFloater(ctx, delay = 0) {
   ), delay);
 }
 
-// Generic burst overlay at a cell — div absolutely positioned, animated by CSS.
-function burstAt(cell, color, klass = 'chain-burst', duration = 700) {
+// Generic burst overlay at a cell.
+function burstAt(cell, color, klass = 'chain-burst-ring', duration = 600) {
   const b = document.createElement('span');
   b.className = klass;
   b.style.setProperty('--burst-color', color);
@@ -155,21 +151,15 @@ function burstAt(cell, color, klass = 'chain-burst', duration = 700) {
 
 // Spawn N particle dots that fly outward from a cell.
 function particlesAt(cell, color, count = 8, opts = {}) {
-  const {
-    klass = 'chain-particle',
-    spread = 50,        // px max distance
-    duration = 900,
-  } = opts;
+  const { klass = 'chain-particle', spread = 50, duration = 900 } = opts;
   for (let i = 0; i < count; i++) {
     const p = document.createElement('span');
     p.className = klass;
     const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
     const dist  = spread * (0.6 + Math.random() * 0.5);
-    const dx = Math.cos(angle) * dist;
-    const dy = Math.sin(angle) * dist;
     p.style.setProperty('--p-color', color);
-    p.style.setProperty('--p-dx', `${dx.toFixed(0)}px`);
-    p.style.setProperty('--p-dy', `${dy.toFixed(0)}px`);
+    p.style.setProperty('--p-dx', `${(Math.cos(angle) * dist).toFixed(0)}px`);
+    p.style.setProperty('--p-dy', `${(Math.sin(angle) * dist).toFixed(0)}px`);
     p.style.animationDelay = `${Math.random() * 80}ms`;
     cell.appendChild(p);
   }
@@ -178,16 +168,14 @@ function particlesAt(cell, color, count = 8, opts = {}) {
   }, duration + 200);
 }
 
-// Spawn N colored confetti rectangles that rise + drift.
 function confettiAt(cell, color, count = 12) {
   const palette = [color, '#ff5a5f', '#ffc857', '#3498db', '#2ecc71', '#9b59b6'];
   for (let i = 0; i < count; i++) {
     const p = document.createElement('span');
     p.className = 'chain-confetti';
-    const dx = (Math.random() - 0.5) * 80;
+    const dx  = (Math.random() - 0.5) * 80;
     const rot = (Math.random() - 0.5) * 720;
-    const c = palette[i % palette.length];
-    p.style.setProperty('--c-color', c);
+    p.style.setProperty('--c-color', palette[i % palette.length]);
     p.style.setProperty('--c-dx', `${dx.toFixed(0)}px`);
     p.style.setProperty('--c-rot', `${rot.toFixed(0)}deg`);
     p.style.animationDelay = `${Math.random() * 120}ms`;
@@ -198,7 +186,6 @@ function confettiAt(cell, color, count = 12) {
   }, 1500);
 }
 
-// Apply perCellFn to cells with timing pattern.
 function runSequence(cells, perCellFn, opts = {}) {
   const { stepMs = 65, reverse = false } = opts;
   const ordered = reverse ? [...cells].reverse() : cells;
@@ -211,31 +198,36 @@ function runSequence(cells, perCellFn, opts = {}) {
 
 const PLAYERS = {};
 
-// 1. Cascade — sequential pulse forward to today (default)
+// 1. CASCADE — forward pulse on past cells, ring "lands" on today, floater
 PLAYERS['cascade'] = (ctx) => {
   const past = ctx.chainCells.slice(0, -1);
   runSequence(past, (cell) => pulseCell(cell, ctx.habit.color));
-  defaultFloater(ctx, Math.max(0, (past.length - 1) * 65));
+  const arrivalDelay = Math.max(0, (past.length - 1) * 65 + 80);
+  setTimeout(() => burstAt(ctx.todayCell, ctx.habit.color, 'chain-burst-ring', 500), arrivalDelay);
+  defaultFloater(ctx, arrivalDelay);
 };
 
-// 2. Backwash — sequential pulse running back from today
+// 2. BACKWASH — ring at today first, then pulse rolls back through past
 PLAYERS['backwash'] = (ctx) => {
+  burstAt(ctx.todayCell, ctx.habit.color, 'chain-burst-ring', 500);
   const past = ctx.chainCells.slice(0, -1);
-  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color), { reverse: true });
-  defaultFloater(ctx, 0);
+  setTimeout(() => {
+    runSequence(past, (cell) => pulseCell(cell, ctx.habit.color), { reverse: true });
+  }, 120);
+  defaultFloater(ctx, 200);
 };
 
-// 3. Wave — accelerating step intervals
+// 3. WAVE — actual squash-stretch wave propagating through cells
 PLAYERS['wave'] = (ctx) => {
   const past = ctx.chainCells.slice(0, -1);
-  past.forEach((cell, i) => {
-    const delay = Math.round(180 * (1 - Math.cos((i / past.length) * Math.PI)) / 2);
-    setTimeout(() => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-soft' }), delay * (i + 1) * 0.5);
-  });
-  defaultFloater(ctx, past.length * 50);
+  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-wave', duration: 520 }), { stepMs: 80 });
+  // Today gets a squash-stretch too as the wave arrives
+  const arrivalDelay = Math.max(0, (past.length - 1) * 80 + 100);
+  setTimeout(() => pulseCell(ctx.todayCell, ctx.habit.color, { klass: 'chain-pulse-wave', duration: 520 }), arrivalDelay);
+  defaultFloater(ctx, arrivalDelay + 200);
 };
 
-// 4. Edge-in — both ends pulse, meet in the middle
+// 4. EDGE-IN — both ends pulse simultaneously, ring converges on today
 PLAYERS['edge-in'] = (ctx) => {
   const past = ctx.chainCells.slice(0, -1);
   const mid = Math.ceil(past.length / 2);
@@ -244,138 +236,157 @@ PLAYERS['edge-in'] = (ctx) => {
     const right = past[past.length - 1 - i];
     if (right && right !== past[i]) setTimeout(() => pulseCell(right, ctx.habit.color), i * 75);
   }
-  defaultFloater(ctx, mid * 75);
+  // Today gets a converging ring (visual "arrival point")
+  const arrivalDelay = Math.max(0, mid * 75 + 60);
+  setTimeout(() => burstAt(ctx.todayCell, ctx.habit.color, 'chain-burst-ring', 500), arrivalDelay);
+  defaultFloater(ctx, arrivalDelay);
 };
 
-// 5. Center-out — middle cell first, expands outward
+// 5. CENTER-OUT — middle cell first, then pulses spread outward + ring at today
 PLAYERS['center-out'] = (ctx) => {
   const past = ctx.chainCells.slice(0, -1);
-  const mid = Math.floor(past.length / 2);
-  past.forEach((cell, i) => {
-    const dist = Math.abs(i - mid);
-    setTimeout(() => pulseCell(cell, ctx.habit.color), dist * 75);
-  });
-  defaultFloater(ctx, Math.ceil(past.length / 2) * 75);
+  if (past.length > 0) {
+    const mid = Math.floor(past.length / 2);
+    past.forEach((cell, i) => {
+      const dist = Math.abs(i - mid);
+      setTimeout(() => pulseCell(cell, ctx.habit.color), dist * 75);
+    });
+  }
+  // Today gets a shockwave so the "spread out" feel completes there
+  const arrivalDelay = Math.ceil((past.length || 1) / 2) * 75;
+  setTimeout(() => burstAt(ctx.todayCell, ctx.habit.color, 'chain-shockwave', 600), arrivalDelay);
+  defaultFloater(ctx, arrivalDelay + 100);
 };
 
-// 6. Glow trail — sequential glow only, no scale
+// 6. GLOW-TRAIL — pure color glow trailing through cells, no scale at all
 PLAYERS['glow-trail'] = (ctx) => {
   const past = ctx.chainCells.slice(0, -1);
-  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-glow', duration: 600 }));
-  defaultFloater(ctx, Math.max(0, (past.length - 1) * 65));
+  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-glow', duration: 700 }));
+  // Today gets the strongest, longest glow as the destination
+  const arrivalDelay = Math.max(0, (past.length - 1) * 65 + 100);
+  setTimeout(() => pulseCell(ctx.todayCell, ctx.habit.color, { klass: 'chain-pulse-glow-strong', duration: 900 }), arrivalDelay);
+  defaultFloater(ctx, arrivalDelay + 200);
 };
 
-// 7. Ripple trail — each cell emits a ring as it pulses
+// 7. RIPPLE-TRAIL — each cell emits its own ring as it pulses, including today
 PLAYERS['ripple-trail'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  runSequence(past, (cell) => {
-    pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-soft' });
-    burstAt(cell, ctx.habit.color, 'chain-burst-ring', 600);
+  runSequence(ctx.chainCells, (cell, i, n) => {
+    pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-soft', duration: 360 });
+    burstAt(cell, ctx.habit.color, 'chain-burst-ring', 500);
   });
-  defaultFloater(ctx, Math.max(0, (past.length - 1) * 65));
+  defaultFloater(ctx, Math.max(0, (ctx.chainCells.length - 1) * 65 + 200));
 };
 
-// 8. Shimmer row — diagonal light streak sweeps each cell
+// 8. SHIMMER-ROW — diagonal light sweep across each cell in sequence, including today
 PLAYERS['shimmer-row'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  runSequence(past, (cell) => {
+  runSequence(ctx.chainCells, (cell) => {
     cell.classList.add('chain-shimmer');
     setTimeout(() => cell.classList.remove('chain-shimmer'), 520);
   }, { stepMs: 55 });
-  defaultFloater(ctx, Math.max(0, (past.length - 1) * 55));
+  defaultFloater(ctx, Math.max(0, (ctx.chainCells.length - 1) * 55 + 200));
 };
 
-// 9. Dominos — sequential tilt as if falling
+// 9. DOMINOS — sequential tilt-and-fall, today snaps with extra emphasis
 PLAYERS['dominos'] = (ctx) => {
   const past = ctx.chainCells.slice(0, -1);
-  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-tilt' }), { stepMs: 75 });
-  defaultFloater(ctx, Math.max(0, (past.length - 1) * 75));
+  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-tilt', duration: 500 }), { stepMs: 75 });
+  // Today: the LAST domino snaps in place with a flash
+  const arrivalDelay = Math.max(0, (past.length - 1) * 75 + 80);
+  setTimeout(() => {
+    pulseCell(ctx.todayCell, ctx.habit.color, { klass: 'chain-pulse-tilt', duration: 500 });
+    burstAt(ctx.todayCell, ctx.habit.color, 'chain-burst-ring', 400);
+  }, arrivalDelay);
+  defaultFloater(ctx, arrivalDelay + 100);
 };
 
-// 10. Flicker — rapid on-off pulse on each cell
+// 10. FLICKER — rapid on/off across cells including today
 PLAYERS['flicker'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-flicker', duration: 350 }), { stepMs: 40 });
-  defaultFloater(ctx, Math.max(0, (past.length - 1) * 40));
+  runSequence(ctx.chainCells, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-flicker', duration: 360 }), { stepMs: 40 });
+  defaultFloater(ctx, Math.max(0, (ctx.chainCells.length - 1) * 40 + 200));
 };
 
-// 11. Surge — all chain cells pulse simultaneously
+// 11. SURGE — whole chain pulses simultaneously, today gets extra ring
 PLAYERS['surge'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  past.forEach(cell => pulseCell(cell, ctx.habit.color));
-  defaultFloater(ctx, 200);
+  ctx.chainCells.forEach(cell => pulseCell(cell, ctx.habit.color));
+  burstAt(ctx.todayCell, ctx.habit.color, 'chain-burst-ring', 500);
+  defaultFloater(ctx, 300);
 };
 
-// 12. Heartbeat — two quick simultaneous pulses
+// 12. HEARTBEAT — two simultaneous beats on all cells, today gets emphasis
 PLAYERS['heartbeat'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  past.forEach(cell => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-soft', duration: 240 }));
-  setTimeout(() => past.forEach(cell => pulseCell(cell, ctx.habit.color, { duration: 340 })), 280);
+  const beat = () => ctx.chainCells.forEach(cell =>
+    pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-soft', duration: 240 })
+  );
+  beat();
+  setTimeout(beat, 300);
+  setTimeout(() => burstAt(ctx.todayCell, ctx.habit.color, 'chain-burst-ring', 500), 280);
+  defaultFloater(ctx, 600);
+};
+
+// 13. BREATHE — slow simultaneous scale across all cells
+PLAYERS['breathe'] = (ctx) => {
+  ctx.chainCells.forEach(cell => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-breathe', duration: 900 }));
   defaultFloater(ctx, 500);
 };
 
-// 13. Breathe — slow simultaneous scale in and out
-PLAYERS['breathe'] = (ctx) => {
+// 14. BLOOM — radial color bloom expanding from today across the chain
+PLAYERS['bloom'] = (ctx) => {
+  burstAt(ctx.todayCell, ctx.habit.color, 'chain-bloom', 800);
   const past = ctx.chainCells.slice(0, -1);
-  past.forEach(cell => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-breathe', duration: 900 }));
-  defaultFloater(ctx, 400);
+  runSequence(past, (cell) =>
+    pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-soft', duration: 400 }),
+    { stepMs: 50, reverse: true }
+  );
+  defaultFloater(ctx, 200);
 };
 
-// 14. Whisper — minimal subtle pulse
-PLAYERS['whisper'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  runSequence(past, (cell) => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-soft', duration: 380 }), { stepMs: 50 });
-  defaultFloater(ctx, Math.max(0, (past.length - 1) * 50));
-};
-
-// 15. Gentle glow — soft sustained glow on chain, no movement
+// 15. GENTLE-GLOW — long, atmospheric simultaneous glow
 PLAYERS['gentle-glow'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  past.forEach(cell => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-glow', duration: 900 }));
-  defaultFloater(ctx, 400);
+  ctx.chainCells.forEach(cell => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-glow-long', duration: 1200 }));
+  defaultFloater(ctx, 600);
 };
 
-// 16. Echo — pulse on today, then ripple back along chain
+// 16. ECHO — rings ripple OUT from today through past cells in reverse
 PLAYERS['echo'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
   burstAt(ctx.todayCell, ctx.habit.color, 'chain-burst-ring', 600);
+  const past = ctx.chainCells.slice(0, -1);
   runSequence(past, (cell) => burstAt(cell, ctx.habit.color, 'chain-burst-ring', 500), { stepMs: 70, reverse: true });
   defaultFloater(ctx, 200);
 };
 
-// 17. Shockwave — single large ring expands from today
+// 17. SHOCKWAVE — single large expanding ring from today
 PLAYERS['shockwave'] = (ctx) => {
   burstAt(ctx.todayCell, ctx.habit.color, 'chain-shockwave', 850);
   defaultFloater(ctx, 100);
 };
 
-// 18. Pulse bomb — heavy radial glow at today
+// 18. PULSE-BOMB — heavy radial glow at today
 PLAYERS['pulse-bomb'] = (ctx) => {
   burstAt(ctx.todayCell, ctx.habit.color, 'chain-pulse-bomb', 700);
   defaultFloater(ctx, 50);
 };
 
-// 19. Starburst — star rays at today
+// 19. STARBURST — star rays at today
 PLAYERS['starburst'] = (ctx) => {
   burstAt(ctx.todayCell, ctx.habit.color, 'chain-starburst', 700);
   defaultFloater(ctx, 100);
 };
 
-// 20. Fireworks — particle burst at today (count scales with streak)
+// 20. FIREWORKS — particle burst at today (count scales with streak)
 PLAYERS['fireworks'] = (ctx) => {
   const count = Math.min(6 + ctx.streakLength, 24);
   particlesAt(ctx.todayCell, ctx.habit.color, count, { spread: 60 });
   defaultFloater(ctx, 100);
 };
 
-// 21. Confetti — colored particle rise from today
+// 21. CONFETTI — colored particles rise from today
 PLAYERS['confetti'] = (ctx) => {
   const count = Math.min(8 + ctx.streakLength, 28);
   confettiAt(ctx.todayCell, ctx.habit.color, count);
   defaultFloater(ctx, 100);
 };
 
-// 22. Counter — animated tick from 1 to N at today
+// 22. COUNTER — animated tick from 1 to N at today (no chain effect)
 PLAYERS['counter'] = (ctx) => {
   const fl = document.createElement('span');
   fl.className = 'chain-floater chain-floater-counter';
@@ -394,19 +405,18 @@ PLAYERS['counter'] = (ctx) => {
   setTimeout(() => fl.remove(), 1500);
 };
 
-// 23. Stack — small +1s float up from each chain cell, converging
+// 23. STACK — small +1s float up from each cell, default floater at today
 PLAYERS['stack'] = (ctx) => {
   const past = ctx.chainCells.slice(0, -1);
   past.forEach((cell, i) => {
-    setTimeout(() => showFloater(cell, '+1', ctx.habit.color, { size: 12, klass: 'chain-floater chain-floater-mini', duration: 900 }), i * 60);
+    setTimeout(() => showFloater(cell, '+1', ctx.habit.color, { size: 12, klass: 'chain-floater chain-floater-mini', duration: 900 }), i * 80);
   });
-  defaultFloater(ctx, past.length * 60 + 100);
+  defaultFloater(ctx, past.length * 80 + 120);
 };
 
-// 24. Combo — "COMBO!" themed text + cell flashes
+// 24. COMBO — "COMBO!" themed text + cell flickers
 PLAYERS['combo'] = (ctx) => {
-  const past = ctx.chainCells.slice(0, -1);
-  past.forEach(cell => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-flicker', duration: 300 }));
+  ctx.chainCells.forEach(cell => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-flicker', duration: 320 }));
   const fl = document.createElement('span');
   fl.className = 'chain-floater chain-floater-combo';
   fl.style.setProperty('--floater-color', ctx.habit.color);
@@ -415,7 +425,7 @@ PLAYERS['combo'] = (ctx) => {
   setTimeout(() => fl.remove(), 1400);
 };
 
-// 25. Streak fire — flame floater that grows with streak
+// 25. STREAK-FIRE — flame floater that grows with streak + warming chain
 PLAYERS['streak-fire'] = (ctx) => {
   const fl = document.createElement('span');
   fl.className = 'chain-floater chain-floater-fire';
@@ -424,7 +434,6 @@ PLAYERS['streak-fire'] = (ctx) => {
   fl.innerHTML = `<span class="fire-emoji">${flames}</span><span class="fire-num">${ctx.streakLength}</span>`;
   fl.style.fontSize = `${floaterSize(ctx.streakLength)}px`;
   ctx.todayCell.appendChild(fl);
-  // Quick warming pulse on chain too
   const past = ctx.chainCells.slice(0, -1);
   past.forEach((cell, i) => {
     setTimeout(() => pulseCell(cell, ctx.habit.color, { klass: 'chain-pulse-glow', duration: 500 }), i * 50);
