@@ -28,6 +28,35 @@ const state = {
 
 const ALL_VIEW_ID = 'all';
 
+// View-toggle icons — both are calendars, but visually distinct:
+//   ICON_VIEW_CONTINUOUS shows a long horizontal strip with day columns
+//   ICON_VIEW_MONTHS     shows a tall grid of month cells
+// We show the DESTINATION view's icon: when you're in months, the toggle
+// shows the continuous icon so it telegraphs what clicking does.
+const ICON_VIEW_CONTINUOUS = `
+  <svg width="20" height="20" viewBox="0 0 22 22" fill="none" stroke="currentColor"
+       stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="2" y="7" width="18" height="11" rx="1.2"/>
+    <line x1="2"    y1="10.5" x2="20"   y2="10.5"/>
+    <line x1="5.5"  y1="10.5" x2="5.5"  y2="18"/>
+    <line x1="8.5"  y1="10.5" x2="8.5"  y2="18"/>
+    <line x1="11.5" y1="10.5" x2="11.5" y2="18"/>
+    <line x1="14.5" y1="10.5" x2="14.5" y2="18"/>
+    <line x1="17.5" y1="10.5" x2="17.5" y2="18"/>
+  </svg>`;
+const ICON_VIEW_MONTHS = `
+  <svg width="20" height="20" viewBox="0 0 22 22" fill="none" stroke="currentColor"
+       stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3" y="4" width="16" height="16" rx="1.5"/>
+    <line x1="3" y1="8"  x2="19" y2="8"/>
+    <line x1="3" y1="13" x2="19" y2="13"/>
+    <line x1="9"  y1="8" x2="9"  y2="20"/>
+    <line x1="13" y1="8" x2="13" y2="20"/>
+    <line x1="6.5"  y1="3" x2="6.5"  y2="5.5"/>
+    <line x1="15.5" y1="3" x2="15.5" y2="5.5"/>
+  </svg>`;
+const viewToggleIcon = () => getViewMode() === 'months' ? ICON_VIEW_CONTINUOUS : ICON_VIEW_MONTHS;
+
 // View mode: how the calendar lays out the year. 'months' = 3x4 grid of
 // month cards (default), 'continuous' = one wide 7-row x ~53-col strip.
 // Stored per-user as a UI preference, not synced via Supabase.
@@ -105,7 +134,7 @@ function renderShell() {
         <div class="header-spacer"></div>
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
-        <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${getViewMode() === 'months' ? '≡' : '▦'}</button>
+        <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${viewToggleIcon()}</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
         <button class="icon-btn" id="signoutBtn" title="Sign out" aria-label="Sign out">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -163,7 +192,7 @@ function renderShell() {
   const viewToggle = document.getElementById('viewToggle');
   viewToggle.addEventListener('click', () => {
     setViewMode(getViewMode() === 'months' ? 'continuous' : 'months');
-    viewToggle.textContent = getViewMode() === 'months' ? '≡' : '▦';
+    viewToggle.innerHTML = viewToggleIcon();
     updateYearLabel();
     if (state.currentHabitId) loadAndRenderCalendar();
   });
