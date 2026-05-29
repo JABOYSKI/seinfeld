@@ -1,6 +1,6 @@
 // Main controller — boots, routes auth vs tracker, owns app state.
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
-import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS, DEFAULT_TEXT_COLOR, normalizeTextColor } from './habits.js';
+import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS, DEFAULT_TEXT_COLOR, normalizeTextColor, migrationFileForColumn } from './habits.js';
 import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 import { buildColorWheel } from './colorWheel.js';
 import { loadCompletions, markDay, unmarkDay } from './completions.js';
@@ -495,23 +495,27 @@ function openHabitDialog(existing = null) {
     const name = nameEl.value.trim();
     if (!name) { toast('Give it a name.', 'error'); return; }
     try {
+      let saved;
       if (isEdit) {
-        const fields = { name, color: chosenColor };
-        // Only send texture / text_color if it's been customised — keeps
-        // the update compatible with the old schema (pre-migration 002/003).
-        if (chosenTexture !== DEFAULT_TEXTURE_ID || existing.texture) fields.texture = chosenTexture;
-        if (chosenTextColor !== DEFAULT_TEXT_COLOR || existing.text_color) fields.text_color = chosenTextColor;
-        const updated = await updateHabit(existing.id, fields);
-        Object.assign(existing, updated);
+        const fields = { name, color: chosenColor, texture: chosenTexture, text_color: chosenTextColor };
+        saved = await updateHabit(existing.id, fields);
+        Object.assign(existing, saved);
         renderTabs();
         if (existing.id === state.currentHabitId) await loadAndRenderCalendar();
       } else {
-        const created = await createHabit(getUser().id, name, chosenColor, chosenTexture, chosenTextColor);
-        state.habits.push(created);
-        state.currentHabitId = created.id;
+        saved = await createHabit(getUser().id, name, chosenColor, chosenTexture, chosenTextColor);
+        state.habits.push(saved);
+        state.currentHabitId = saved.id;
         renderTabs();
         els.emptyState.hidden = true;
         await loadAndRenderCalendar();
+      }
+      // If the schema was missing optional columns, the habit was still
+      // saved but those fields were dropped. Tell the user which migration
+      // to run so persistence works next time.
+      if (saved && saved._droppedColumns?.length) {
+        const files = saved._droppedColumns.map(migrationFileForColumn).filter(Boolean);
+        toast(`Saved, but run ${files.join(' + ')} in Supabase to persist ${saved._droppedColumns.join(' + ')}.`, 'error');
       }
       close();
     } catch (err) {

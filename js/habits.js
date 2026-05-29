@@ -3,6 +3,41 @@ import { supabase, withTimeout } from './supabase.js';
 import { todayISO } from './utils.js';
 import { DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 
+// Columns that may not yet exist in the user's schema (added by later
+// migrations). When Supabase rejects a write because one of these is missing
+// from the schema cache, we strip it and retry — so the user can keep using
+// the app even before they've run the migration.
+const OPTIONAL_COLUMNS = ['texture', 'text_color'];
+const COLUMN_MIGRATIONS = {
+  texture:    'migrations/002_textures.sql',
+  text_color: 'migrations/003_text_color.sql',
+};
+export function migrationFileForColumn(col) { return COLUMN_MIGRATIONS[col]; }
+
+// Runs `buildQuery(body)` and, when Supabase says the column doesn't exist,
+// drops that column and retries. Returns the row data, with a non-enumerable
+// _droppedColumns array attached when any column had to be stripped so the
+// caller can surface "run migration X" guidance.
+async function withColumnFallback(buildQuery, payload, label) {
+  let body = { ...payload };
+  const dropped = [];
+  for (let i = 0; i <= OPTIONAL_COLUMNS.length; i++) {
+    const { data, error } = await buildQuery(body);
+    if (!error) {
+      if (data && dropped.length) data._droppedColumns = dropped.slice();
+      return data;
+    }
+    const m = error.message?.match(/Could not find the '(\w+)' column/);
+    if (m && OPTIONAL_COLUMNS.includes(m[1]) && body[m[1]] !== undefined) {
+      dropped.push(m[1]);
+      delete body[m[1]];
+      continue;
+    }
+    throw error;
+  }
+  throw new Error(`Too many schema-fallback retries on ${label}`);
+}
+
 // Palette offered when creating/editing a habit. Picked for distinct hues
 // that read well as solid-filled day cells against both light and dark.
 export const COLORS = [
@@ -55,25 +90,18 @@ export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE
   // user west of UTC after their local 5pm-ish — that future date then
   // locks every cell with "habit didn't exist yet."
   const created_at = todayISO();
-  const row = { user_id: userId, name, color, sort_order, created_at };
-  // Only send texture/text_color if customised — keeps insert compatible
-  // with the old schema (pre-migration 002/003), where those columns don't
-  // exist yet.
-  const tx = normalizeTexture(texture);
-  if (tx !== DEFAULT_TEXTURE_ID) row.texture = tx;
-  const tc = normalizeTextColor(textColor);
-  if (tc !== DEFAULT_TEXT_COLOR) row.text_color = tc;
-  const { data, error } = await withTimeout(
-    supabase
-      .from('habits')
-      .insert(row)
-      .select()
-      .single(),
-    8000,
-    'createHabit'
+  const row = {
+    user_id: userId, name, color, sort_order, created_at,
+    texture: normalizeTexture(texture),
+    text_color: normalizeTextColor(textColor),
+  };
+  return await withColumnFallback(
+    (body) => withTimeout(
+      supabase.from('habits').insert(body).select().single(),
+      8000, 'createHabit'
+    ),
+    row, 'createHabit'
   );
-  if (error) throw error;
-  return data;
 }
 
 // One-shot repair: if any habit's created_at is in the future (UTC vs local
@@ -95,13 +123,13 @@ export async function repairFutureCreatedDates(userId) {
 }
 
 export async function updateHabit(id, fields) {
-  const { data, error } = await withTimeout(
-    supabase.from('habits').update(fields).eq('id', id).select().single(),
-    8000,
-    'updateHabit'
+  return await withColumnFallback(
+    (body) => withTimeout(
+      supabase.from('habits').update(body).eq('id', id).select().single(),
+      8000, 'updateHabit'
+    ),
+    fields, 'updateHabit'
   );
-  if (error) throw error;
-  return data;
 }
 
 export async function deleteHabit(id) {
