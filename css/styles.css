@@ -685,20 +685,22 @@ button { font: inherit; color: inherit; }
 }
 .calendar-continuous .day-num { display: none; }
 
-/* Week-number row sits under each year strip in continuous view. Hidden by
-   default; the # toggle in the header adds .with-week-numbers to the
-   calendar container to make them visible. */
+/* Week-number row sits under each year strip in continuous view. Always
+   rendered into layout so toggling the # button doesn't push subsequent
+   year strips up and down — only the visibility of the numbers themselves
+   flips. */
 .strip-week-numbers {
-  display: none;  /* shown by .with-week-numbers below */
+  display: grid;
   margin-left: 22px;  /* match strip-months gutter */
   margin-top: 3px;
   gap: 2px;
   font-size: 8px;
   color: var(--text-faint);
   line-height: 1;
+  visibility: hidden;
 }
 .strip-week-numbers > span { text-align: center; }
-.calendar-continuous.with-week-numbers .strip-week-numbers { display: grid; }
+.calendar-continuous.with-week-numbers .strip-week-numbers { visibility: visible; }
 
 /* Months view week-numbers — the 16px gutter on the left is ALWAYS present
    in layout (8-column grid) when the renderer emits week-num cells, so day
