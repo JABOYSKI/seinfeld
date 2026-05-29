@@ -17,6 +17,11 @@ import { normalizeTexture } from './textures.js';
 function setCalendarLayout(container, classes) {
   ['calendar-all', 'calendar-continuous'].forEach(c => container.classList.remove(c));
   classes.forEach(c => container.classList.add(c));
+  // Signal to CSS that this renderer emits the week-num + wd-corner cells,
+  // so the 8-col grid template applies. Without this marker, old cached JS
+  // (which doesn't emit those cells) wouldn't trip the 8-col rule and the
+  // grid stays at the legacy 7 cols — no misalignment during cache rollover.
+  container.classList.add('has-week-num-cells');
 }
 
 export function renderCalendar(container, habit, completions, year) {

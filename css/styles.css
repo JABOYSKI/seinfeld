@@ -701,12 +701,18 @@ button { font: inherit; color: inherit; }
 .calendar-continuous.with-week-numbers .strip-week-numbers { display: grid; }
 
 /* Months view week-numbers — the 16px gutter on the left is ALWAYS present
-   in layout (8-column grid), so day cells stay the same size and position
-   regardless of whether week numbers are visible. The toggle only flips
-   the visibility of the numbers themselves. .month-week-num and .wd-corner
-   are always emitted by the renderer. */
-.month-grid,
-.month-weekdays {
+   in layout (8-column grid) when the renderer emits week-num cells, so day
+   cells stay the same size and position regardless of whether week numbers
+   are visible. The toggle only flips the visibility of the numbers.
+   .month-week-num and .wd-corner are emitted unconditionally by the
+   current renderer.
+
+   The .has-week-num-cells class is added by the renderer to signal "I
+   emitted week-num cells; switch the grid to 8 columns". Without it, the
+   default 7-col template stays — this way an old cached JS bundle paired
+   with new CSS doesn't end up with day cells shoved into the gutter. */
+.calendar.has-week-num-cells .month-grid,
+.calendar.has-week-num-cells .month-weekdays {
   grid-template-columns: 16px repeat(7, 1fr);
 }
 .month-week-num {
