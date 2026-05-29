@@ -77,3 +77,14 @@ export function daysInMonth(year, month /* 0-11 */) {
 export function firstWeekdayOfMonth(year, month) {
   return new Date(year, month, 1).getDay();
 }
+
+// Ordinal week-of-year using Sunday-Saturday weeks where week 1 is the
+// week containing January 1 (so Dec 28-31 of the prior year may belong to
+// "week 1" of this year). Convention used by the wall-calendar layout.
+export function ordinalWeekOfYear(date, year) {
+  const jan1 = new Date(year, 0, 1);
+  const jan1Weekday = jan1.getDay();
+  // Sunday at or before Jan 1 — the start of week 1.
+  const week1Sunday = new Date(year, 0, 1 - jan1Weekday);
+  return Math.floor((date - week1Sunday) / (7 * 86_400_000)) + 1;
+}

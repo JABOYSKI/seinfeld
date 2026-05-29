@@ -5,10 +5,17 @@
 //     habit's tab.
 import {
   MONTH_SHORT, WEEKDAY_LETTERS,
-  daysInMonth, firstWeekdayOfMonth,
+  daysInMonth, firstWeekdayOfMonth, ordinalWeekOfYear,
   todayISO, canEditDay, daysBetween,
 } from './utils.js';
 import { normalizeTexture } from './textures.js';
+
+// Read week-number toggle directly from localStorage. The alternative was
+// threading a parameter through every renderer signature; this is a small
+// coupling for a much smaller API surface.
+function showWeekNumbers() {
+  return localStorage.getItem('seinfeld_show_week_numbers') === 'true';
+}
 
 // ----- Single-habit (existing) view ---------------------------------------
 
@@ -25,9 +32,9 @@ export function renderCalendar(container, habit, completions, year) {
 
   let html = '';
   for (let m = 0; m < 12; m++) {
-    html += renderMonth(m, year, (cells) => cells.map(({ iso, dayNum }) =>
+    html += renderMonth(m, year, (iso, dayNum) =>
       renderDay(iso, dayNum, habit, completions, today, habitCreated)
-    ).join(''));
+    );
   }
 
   container.innerHTML = html;
@@ -158,9 +165,9 @@ export function renderAllCalendar(container, habits, completionsByHabit, year) {
 
   let html = '';
   for (let m = 0; m < 12; m++) {
-    html += renderMonth(m, year, (cells) => cells.map(({ iso, dayNum }) =>
+    html += renderMonth(m, year, (iso, dayNum) =>
       renderAllDay(iso, dayNum, habits, completionsByHabit, today)
-    ).join(''));
+    );
   }
 
   container.innerHTML = html;
@@ -188,35 +195,51 @@ export function renderContinuousAllCalendar(container, habits, completionsByHabi
 
 // ----- Shared month scaffolding -------------------------------------------
 
-// `renderCells` is a function that takes an array of { iso, dayNum } and
-// returns the joined HTML string for the day buttons. Lets us reuse the
-// month chrome (header, weekdays, blank leaders/tails) across both views.
-function renderMonth(month, year, renderCells) {
+// `renderCell` is a function (iso, dayNum) => HTML for one day cell. Lets us
+// reuse the month chrome across single-habit and All views.
+//
+// When showWeekNumbers() is on, an extra left column holds the ordinal week
+// number for each row. Both .month-grid and .month-weekdays then become an
+// 8-column grid (1 week-num + 7 days) via the .with-week-numbers ancestor
+// class on .calendar.
+function renderMonth(month, year, renderCell) {
   const dim = daysInMonth(year, month);
   const first = firstWeekdayOfMonth(year, month);
-
-  let leading = '';
-  for (let i = 0; i < first; i++) leading += `<div class="day day-blank"></div>`;
-
-  const cellData = [];
-  for (let d = 1; d <= dim; d++) {
-    const iso = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    cellData.push({ iso, dayNum: d });
-  }
-  const cells = renderCells(cellData);
-
   const used = first + dim;
   const tail = (7 - (used % 7)) % 7;
-  let trailing = '';
-  for (let i = 0; i < tail; i++) trailing += `<div class="day day-blank"></div>`;
+  const totalCells = used + tail;
+  const rowCount = totalCells / 7;
+  const wn = showWeekNumbers();
+
+  let body = '';
+  for (let r = 0; r < rowCount; r++) {
+    if (wn) {
+      // Sunday at the start of this row, used to compute the week number.
+      const rowSunday = new Date(year, month, 1 - first + r * 7);
+      body += `<div class="month-week-num">${ordinalWeekOfYear(rowSunday, year)}</div>`;
+    }
+    for (let i = 0; i < 7; i++) {
+      const dayOfMonth = r * 7 + i - first + 1;
+      if (dayOfMonth < 1 || dayOfMonth > dim) {
+        body += `<div class="day day-blank"></div>`;
+      } else {
+        const iso = `${year}-${String(month + 1).padStart(2,'0')}-${String(dayOfMonth).padStart(2,'0')}`;
+        body += renderCell(iso, dayOfMonth);
+      }
+    }
+  }
+
+  // Header row gets a matching empty corner cell when week-nums are on so
+  // weekday letters stay aligned over their day columns.
+  const weekdayHeader =
+    (wn ? `<div class="wd-corner"></div>` : '') +
+    WEEKDAY_LETTERS.map(l => `<div class="wd">${l}</div>`).join('');
 
   return `
     <div class="month">
       <div class="month-name">${MONTH_SHORT[month]}</div>
-      <div class="month-weekdays">
-        ${WEEKDAY_LETTERS.map(l => `<div class="wd">${l}</div>`).join('')}
-      </div>
-      <div class="month-grid">${leading}${cells}${trailing}</div>
+      <div class="month-weekdays">${weekdayHeader}</div>
+      <div class="month-grid">${body}</div>
     </div>
   `;
 }

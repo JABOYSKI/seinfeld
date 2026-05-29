@@ -689,6 +689,26 @@ button { font: inherit; color: inherit; }
 .strip-week-numbers > span { text-align: center; }
 .calendar-continuous.with-week-numbers .strip-week-numbers { display: grid; }
 
+/* Months view week-numbers — JS interleaves a small label cell at the start
+   of each week row when the toggle is on. The .calendar.with-week-numbers
+   class triggers an 8-column grid (1 narrow week-num + 7 days); without it
+   the grid stays the default 7 columns of days. The .month-week-num /
+   .wd-corner elements aren't rendered when the toggle is off. */
+.calendar.with-week-numbers .month-grid,
+.calendar.with-week-numbers .month-weekdays {
+  grid-template-columns: 16px repeat(7, 1fr);
+}
+.month-week-num {
+  font-size: 9px;
+  color: var(--text-faint);
+  text-align: right;
+  padding-right: 3px;
+  align-self: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.wd-corner { /* empty header above the week-num column */ }
+
 /* Active state for header icon-buttons (used by the # week-number toggle). */
 .icon-btn.is-active {
   background: color-mix(in srgb, var(--accent) 18%, var(--card));

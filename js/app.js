@@ -229,6 +229,11 @@ function renderShell() {
     setShowWeekNumbers(next);
     weekNumBtn.classList.toggle('is-active', next);
     els.calendar.classList.toggle('with-week-numbers', next);
+    // Months view changes its grid structure based on the toggle (extra left
+    // column for week numbers), so re-render. Continuous view's CSS handles
+    // it without a re-render, but rerendering both keeps the code paths
+    // simple and the cost is one already-cached fetch.
+    if (state.currentHabitId) loadAndRenderCalendar();
   });
   els.calendar.addEventListener('click', onCalendarClick);
   document.getElementById('emptyCreate').addEventListener('click', () => openHabitDialog());
