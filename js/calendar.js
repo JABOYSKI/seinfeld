@@ -10,13 +10,6 @@ import {
 } from './utils.js';
 import { normalizeTexture } from './textures.js';
 
-// Read week-number toggle directly from localStorage. The alternative was
-// threading a parameter through every renderer signature; this is a small
-// coupling for a much smaller API surface.
-function showWeekNumbers() {
-  return localStorage.getItem('seinfeld_show_week_numbers') === 'true';
-}
-
 // ----- Single-habit (existing) view ---------------------------------------
 
 // Sets exactly the layout-mode classes the active renderer needs, stripping
@@ -198,10 +191,10 @@ export function renderContinuousAllCalendar(container, habits, completionsByHabi
 // `renderCell` is a function (iso, dayNum) => HTML for one day cell. Lets us
 // reuse the month chrome across single-habit and All views.
 //
-// When showWeekNumbers() is on, an extra left column holds the ordinal week
-// number for each row. Both .month-grid and .month-weekdays then become an
-// 8-column grid (1 week-num + 7 days) via the .with-week-numbers ancestor
-// class on .calendar.
+// The 16px week-number gutter is ALWAYS present in layout (8-col grid:
+// 1 narrow + 7 days), and the week-num cell + wd-corner are always emitted.
+// The toggle only flips the gutter's contents from visible to hidden, so
+// the day cells never resize or shift when the user toggles week numbers.
 function renderMonth(month, year, renderCell) {
   const dim = daysInMonth(year, month);
   const first = firstWeekdayOfMonth(year, month);
@@ -209,15 +202,12 @@ function renderMonth(month, year, renderCell) {
   const tail = (7 - (used % 7)) % 7;
   const totalCells = used + tail;
   const rowCount = totalCells / 7;
-  const wn = showWeekNumbers();
 
   let body = '';
   for (let r = 0; r < rowCount; r++) {
-    if (wn) {
-      // Sunday at the start of this row, used to compute the week number.
-      const rowSunday = new Date(year, month, 1 - first + r * 7);
-      body += `<div class="month-week-num">${ordinalWeekOfYear(rowSunday, year)}</div>`;
-    }
+    // Sunday at the start of this row, used to compute the week number.
+    const rowSunday = new Date(year, month, 1 - first + r * 7);
+    body += `<div class="month-week-num">${ordinalWeekOfYear(rowSunday, year)}</div>`;
     for (let i = 0; i < 7; i++) {
       const dayOfMonth = r * 7 + i - first + 1;
       if (dayOfMonth < 1 || dayOfMonth > dim) {
@@ -229,10 +219,8 @@ function renderMonth(month, year, renderCell) {
     }
   }
 
-  // Header row gets a matching empty corner cell when week-nums are on so
-  // weekday letters stay aligned over their day columns.
   const weekdayHeader =
-    (wn ? `<div class="wd-corner"></div>` : '') +
+    `<div class="wd-corner"></div>` +
     WEEKDAY_LETTERS.map(l => `<div class="wd">${l}</div>`).join('');
 
   return `

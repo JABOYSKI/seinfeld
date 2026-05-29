@@ -228,13 +228,10 @@ function renderShell() {
     const next = !getShowWeekNumbers();
     setShowWeekNumbers(next);
     weekNumBtn.classList.toggle('is-active', next);
-    // Re-render synchronously from cached state. The previous async refetch
-    // caused a frame where the new .with-week-numbers class was on the
-    // container but the old 7-cell HTML was still there, so the months
-    // grid briefly reflowed into the new 8-col template with mismatched
-    // cells. This path stays in one JS turn so the browser never paints
-    // the intermediate state.
-    rerenderCalendarSync();
+    // No re-render needed — the 16px week-num gutter is always present in
+    // the months grid, and the week-num cells are always emitted; we just
+    // flip CSS visibility on. Day cells don't move at all.
+    els.calendar.classList.toggle('with-week-numbers', next);
   });
   els.calendar.addEventListener('click', onCalendarClick);
   document.getElementById('emptyCreate').addEventListener('click', () => openHabitDialog());
