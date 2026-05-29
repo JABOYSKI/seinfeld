@@ -64,8 +64,15 @@ export function renderAuth(container) {
     container.innerHTML = `
       <div class="splash-screen">
         <div class="splash-card">
-          <div class="splash-logo">📅</div>
-          <h1 class="splash-title">Seinfeld</h1>
+          <h1 class="logo logo-splash">
+            <svg class="logo-icon" viewBox="0 0 22 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="4" width="18" height="18" rx="2.5" />
+              <line x1="2" y1="9" x2="20" y2="9" />
+              <line x1="6.5" y1="2" x2="6.5" y2="6.5" />
+              <line x1="15.5" y1="2" x2="15.5" y2="6.5" />
+            </svg>
+            <span class="logo-text">Seinfeld</span>
+          </h1>
           <p class="splash-sub">${isLogin ? "Welcome back. Don't break the chain." : 'Pick a habit. Show up every day. Fill the box.'}</p>
 
           <form id="authForm" novalidate>
