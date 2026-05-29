@@ -52,45 +52,48 @@ export const CONTINUOUS_YEARS = 5;
 export function renderContinuousCalendar(container, habit, completions, year) {
   const today = todayISO();
   const habitCreated = habit.created_at;
-  const startYear = year - (CONTINUOUS_YEARS - 1);
-  const endYear   = year;
+  // `year` is the START of the window — the same year you'd see in months
+  // mode. Toggle between views preserves the focused year that way.
+  const startYear = year;
+  const endYear   = year + (CONTINUOUS_YEARS - 1);
 
-  let allCells = '';
-  let allMonthLabels = '';
-  let allYearLabels = '';
-  let runningCol = 0;
-
+  let blocks = '';
   for (let yr = startYear; yr <= endYear; yr++) {
-    const ys = buildYearStrip(yr, habit, completions, today, habitCreated);
-    allCells += ys.cells;
-
-    // Month labels with absolute (cross-year) grid-column positions.
-    for (let i = 0; i < ys.monthStarts.length; i++) {
-      const { col, month } = ys.monthStarts[i];
-      const nextCol = ys.monthStarts[i + 1]?.col ?? ys.cols;
-      const span = Math.max(1, nextCol - col);
-      const cls = `strip-month-label${month === 0 ? ' is-year-start' : ''}`;
-      allMonthLabels += `<span class="${cls}" style="grid-column: ${runningCol + col + 1} / span ${span};">${MONTH_SHORT[month]}</span>`;
-    }
-
-    allYearLabels += `<span class="strip-year-label" style="grid-column: ${runningCol + 1} / span ${ys.cols};">${yr}</span>`;
-    runningCol += ys.cols;
+    blocks += renderYearBlock(yr, habit, completions, today, habitCreated);
   }
 
-  const totalCols = runningCol;
-  const weekdays = WEEKDAY_LETTERS.map(l => `<span class="strip-weekday">${l}</span>`).join('');
-
-  container.innerHTML = `
-    <div class="strip-years"  style="grid-template-columns: repeat(${totalCols}, var(--strip-cell));">${allYearLabels}</div>
-    <div class="strip-months" style="grid-template-columns: repeat(${totalCols}, var(--strip-cell));">${allMonthLabels}</div>
-    <div class="strip-body">
-      <div class="strip-weekdays">${weekdays}</div>
-      <div class="strip-grid">${allCells}</div>
-    </div>
-  `;
+  container.innerHTML = blocks;
   applyHabitCSSVars(container, habit);
   container.classList.add('calendar-continuous');
   container.classList.remove('calendar-all');
+}
+
+// One self-contained year strip — header + month labels + weekday gutter +
+// 7-row day grid. The CONTINUOUS_YEARS of these stack vertically in the
+// container so the user reads each year as its own row of cells.
+function renderYearBlock(yr, habit, completions, today, habitCreated) {
+  const ys = buildYearStrip(yr, habit, completions, today, habitCreated);
+
+  let labels = '';
+  for (let i = 0; i < ys.monthStarts.length; i++) {
+    const { col, month } = ys.monthStarts[i];
+    const nextCol = ys.monthStarts[i + 1]?.col ?? ys.cols;
+    const span = Math.max(1, nextCol - col);
+    labels += `<span class="strip-month-label" style="grid-column: ${col + 1} / span ${span};">${MONTH_SHORT[month]}</span>`;
+  }
+
+  const weekdays = WEEKDAY_LETTERS.map(l => `<span class="strip-weekday">${l}</span>`).join('');
+
+  return `
+    <div class="strip-year-block">
+      <div class="strip-year-header">${yr}</div>
+      <div class="strip-months" style="grid-template-columns: repeat(${ys.cols}, var(--strip-cell));">${labels}</div>
+      <div class="strip-body">
+        <div class="strip-weekdays">${weekdays}</div>
+        <div class="strip-grid">${ys.cells}</div>
+      </div>
+    </div>
+  `;
 }
 
 // Builds the day cells + month-start col positions for one year. Used by the

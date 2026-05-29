@@ -587,24 +587,21 @@ button { font: inherit; color: inherit; }
 @media (max-width: 700px) {
   .calendar.calendar-continuous { --strip-cell: 12px; }
 }
-.strip-years {
-  display: grid;
-  margin-left: 22px;
-  margin-bottom: 3px;
-  gap: 2px;
-  font-size: 11px;
+/* Each year is its own block: header + months row + body. CONTINUOUS_YEARS
+   of them stack vertically inside .calendar-continuous. */
+.strip-year-block {
+  margin-bottom: 26px;
+}
+.strip-year-block:last-child { margin-bottom: 0; }
+.strip-year-header {
+  font-size: 15px;
   font-weight: 800;
   color: var(--text);
   letter-spacing: 0.5px;
-}
-.strip-year-label {
-  white-space: nowrap;
-  padding-left: 2px;
+  margin-bottom: 6px;
+  margin-left: 22px;
   line-height: 1;
-  /* Year boundary border doubles as visual separator between years */
-  border-left: 1.5px solid color-mix(in srgb, var(--text-dim) 60%, transparent);
 }
-.strip-year-label:first-child { border-left: none; padding-left: 0; }
 
 .strip-months {
   display: grid;
@@ -624,11 +621,6 @@ button { font: inherit; color: inherit; }
   line-height: 1;
 }
 .strip-month-label:first-child { border-left: none; padding-left: 0; }
-/* January of each year (year boundary) gets a more prominent divider */
-.strip-month-label.is-year-start {
-  border-left-width: 2px;
-  border-left-color: color-mix(in srgb, var(--text-dim) 70%, transparent);
-}
 
 .strip-body {
   display: flex;

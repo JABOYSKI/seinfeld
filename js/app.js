@@ -286,9 +286,11 @@ async function loadAndRenderCalendar() {
   if (!habit) return;
   const continuous = getViewMode() === 'continuous';
   try {
-    // Continuous view spans CONTINUOUS_YEARS years; months view is single-year.
+    // Continuous spans CONTINUOUS_YEARS years STARTING at currentYear so
+    // toggling between views keeps the focused year stable (the year shown
+    // in months mode === the first year shown in continuous mode).
     state.completions = continuous
-      ? await loadCompletionsInRange(habit.id, state.currentYear - (CONTINUOUS_YEARS - 1), state.currentYear)
+      ? await loadCompletionsInRange(habit.id, state.currentYear, state.currentYear + (CONTINUOUS_YEARS - 1))
       : await loadCompletions(habit.id, state.currentYear);
   } catch (e) {
     toast(`Failed to load days: ${e.message}`, 'error');
@@ -306,7 +308,7 @@ async function loadAndRenderCalendar() {
 function updateYearLabel() {
   if (!els.yearLabel) return;
   els.yearLabel.textContent = getViewMode() === 'continuous'
-    ? `${state.currentYear - (CONTINUOUS_YEARS - 1)}–${state.currentYear}`
+    ? `${state.currentYear}–${state.currentYear + (CONTINUOUS_YEARS - 1)}`
     : String(state.currentYear);
 }
 
