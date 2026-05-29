@@ -674,6 +674,29 @@ button { font: inherit; color: inherit; }
 }
 .calendar-continuous .day-num { display: none; }
 
+/* Week-number row sits under each year strip in continuous view. Hidden by
+   default; the # toggle in the header adds .with-week-numbers to the
+   calendar container to make them visible. */
+.strip-week-numbers {
+  display: none;  /* shown by .with-week-numbers below */
+  margin-left: 22px;  /* match strip-months gutter */
+  margin-top: 3px;
+  gap: 2px;
+  font-size: 8px;
+  color: var(--text-faint);
+  line-height: 1;
+}
+.strip-week-numbers > span { text-align: center; }
+.calendar-continuous.with-week-numbers .strip-week-numbers { display: grid; }
+
+/* Active state for header icon-buttons (used by the # week-number toggle). */
+.icon-btn.is-active {
+  background: color-mix(in srgb, var(--accent) 18%, var(--card));
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: 800;
+}
+
 /* ----- Overlay / dialog ----- */
 .overlay {
   position: fixed; inset: 0;

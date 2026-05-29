@@ -98,6 +98,10 @@ function wrapYearBlock(yr, ys) {
     labels += `<span class="strip-month-label" style="grid-column: ${col + 1} / span ${span};">${MONTH_SHORT[month]}</span>`;
   }
   const weekdays = WEEKDAY_LETTERS.map(l => `<span class="strip-weekday">${l}</span>`).join('');
+  // Week numbers: ordinal 1..cols, one cell per column. Visibility is
+  // controlled by the .with-week-numbers class on the calendar container.
+  let weekNumbers = '';
+  for (let c = 0; c < ys.cols; c++) weekNumbers += `<span>${c + 1}</span>`;
   return `
     <div class="strip-year-block">
       <div class="strip-year-header">${yr}</div>
@@ -106,6 +110,7 @@ function wrapYearBlock(yr, ys) {
         <div class="strip-weekdays">${weekdays}</div>
         <div class="strip-grid">${ys.cells}</div>
       </div>
+      <div class="strip-week-numbers" style="grid-template-columns: repeat(${ys.cols}, var(--strip-cell));">${weekNumbers}</div>
     </div>
   `;
 }

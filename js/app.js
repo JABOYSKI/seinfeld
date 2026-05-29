@@ -68,6 +68,16 @@ function setViewMode(v) {
   localStorage.setItem(VIEW_STORAGE_KEY, v);
 }
 
+// Week-number row toggle (continuous view only). When on, each year block
+// shows a small row of 1..53 numbers under the day grid.
+const WEEK_NUM_STORAGE_KEY = 'seinfeld_show_week_numbers';
+function getShowWeekNumbers() {
+  return localStorage.getItem(WEEK_NUM_STORAGE_KEY) === 'true';
+}
+function setShowWeekNumbers(v) {
+  localStorage.setItem(WEEK_NUM_STORAGE_KEY, v ? 'true' : 'false');
+}
+
 const els = {
   boot: document.getElementById('bootSplash'),
   authMount: document.getElementById('authMount'),
@@ -151,6 +161,7 @@ function renderShell() {
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
         <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${viewToggleIcon()}</button>
+        <button class="icon-btn ${getShowWeekNumbers() ? 'is-active' : ''}" id="weekNumBtn" title="Toggle week numbers (continuous view)">#</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
         <button class="icon-btn" id="signoutBtn" title="Sign out" aria-label="Sign out">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -211,6 +222,13 @@ function renderShell() {
     viewToggle.innerHTML = viewToggleIcon();
     updateYearLabel();
     if (state.currentHabitId) loadAndRenderCalendar();
+  });
+  const weekNumBtn = document.getElementById('weekNumBtn');
+  weekNumBtn.addEventListener('click', () => {
+    const next = !getShowWeekNumbers();
+    setShowWeekNumbers(next);
+    weekNumBtn.classList.toggle('is-active', next);
+    els.calendar.classList.toggle('with-week-numbers', next);
   });
   els.calendar.addEventListener('click', onCalendarClick);
   document.getElementById('emptyCreate').addEventListener('click', () => openHabitDialog());
@@ -317,6 +335,9 @@ async function loadAndRenderCalendar() {
   } else {
     renderCalendar(els.calendar, habit, state.completions, state.currentYear);
   }
+  // Reapply the week-number visibility class after each re-render so it
+  // survives view-mode + year navigation.
+  els.calendar.classList.toggle('with-week-numbers', getShowWeekNumbers());
   updateYearLabel();
   renderStreak(habit);
 }
@@ -351,6 +372,7 @@ async function loadAndRenderAllCalendar() {
   } else {
     renderAllCalendar(els.calendar, state.habits, state.completionsByHabit, state.currentYear);
   }
+  els.calendar.classList.toggle('with-week-numbers', getShowWeekNumbers());
   renderAllSummary();
 }
 
