@@ -85,18 +85,34 @@ const els = {
 
 async function boot() {
   initTheme();
-  const user = await initAuth();
-  onAuthChange(async (u, event) => {
-    // INITIAL_SESSION is already handled by the explicit initAuth() above —
-    // we only react to subsequent state changes here.
-    if (event === 'INITIAL_SESSION') return;
-    if (event === 'SIGNED_OUT') { showAuth(); return; }
-    if (u && event === 'SIGNED_IN') await showTracker();
-  });
+  // Watchdog: under no circumstances should the boot splash stay forever.
+  // If anything below hangs or throws without surfacing, this kills the
+  // spinner after 15s so the user at least sees the auth/app shell.
+  const watchdog = setTimeout(() => hideBoot(), 15000);
+  try {
+    const user = await initAuth();
+    onAuthChange(async (u, event) => {
+      // INITIAL_SESSION is already handled by the explicit initAuth() above —
+      // we only react to subsequent state changes here.
+      if (event === 'INITIAL_SESSION') return;
+      if (event === 'SIGNED_OUT') { showAuth(); return; }
+      if (u && event === 'SIGNED_IN') {
+        try { await showTracker(); }
+        catch (err) { console.error('showTracker (auth-change):', err); }
+      }
+    });
 
-  if (user) await showTracker();
-  else showAuth();
-  hideBoot();
+    if (user) await showTracker();
+    else showAuth();
+  } catch (err) {
+    console.error('Boot failed:', err);
+    toast(`Boot failed: ${err.message || err}`, 'error');
+    // Make sure SOMETHING is on screen even if auth/data totally collapses.
+    if (els.app.hidden && els.authMount.hidden) showAuth();
+  } finally {
+    clearTimeout(watchdog);
+    hideBoot();
+  }
 }
 
 function hideBoot() {
