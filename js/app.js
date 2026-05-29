@@ -228,12 +228,13 @@ function renderShell() {
     const next = !getShowWeekNumbers();
     setShowWeekNumbers(next);
     weekNumBtn.classList.toggle('is-active', next);
-    els.calendar.classList.toggle('with-week-numbers', next);
-    // Months view changes its grid structure based on the toggle (extra left
-    // column for week numbers), so re-render. Continuous view's CSS handles
-    // it without a re-render, but rerendering both keeps the code paths
-    // simple and the cost is one already-cached fetch.
-    if (state.currentHabitId) loadAndRenderCalendar();
+    // Re-render synchronously from cached state. The previous async refetch
+    // caused a frame where the new .with-week-numbers class was on the
+    // container but the old 7-cell HTML was still there, so the months
+    // grid briefly reflowed into the new 8-col template with mismatched
+    // cells. This path stays in one JS turn so the browser never paints
+    // the intermediate state.
+    rerenderCalendarSync();
   });
   els.calendar.addEventListener('click', onCalendarClick);
   document.getElementById('emptyCreate').addEventListener('click', () => openHabitDialog());
@@ -352,6 +353,34 @@ function updateYearLabel() {
   els.yearLabel.textContent = getViewMode() === 'continuous'
     ? `${state.currentYear}–${state.currentYear + (CONTINUOUS_YEARS - 1)}`
     : String(state.currentYear);
+}
+
+// Re-render the calendar synchronously from already-loaded state (no
+// Supabase fetch). Used by toggles that only change layout — view mode,
+// week-numbers — so the swap is one atomic browser paint without an
+// intermediate frame where new classes meet old HTML.
+function rerenderCalendarSync() {
+  if (!state.currentHabitId) return;
+  const wn = getShowWeekNumbers();
+  if (state.currentHabitId === ALL_VIEW_ID) {
+    if (getViewMode() === 'continuous') {
+      renderContinuousAllCalendar(els.calendar, state.habits, state.completionsByHabit, state.currentYear);
+    } else {
+      renderAllCalendar(els.calendar, state.habits, state.completionsByHabit, state.currentYear);
+    }
+    els.calendar.classList.toggle('with-week-numbers', wn);
+    renderAllSummary();
+    return;
+  }
+  const habit = state.habits.find(h => h.id === state.currentHabitId);
+  if (!habit) return;
+  if (getViewMode() === 'continuous') {
+    renderContinuousCalendar(els.calendar, habit, state.completions, state.currentYear);
+  } else {
+    renderCalendar(els.calendar, habit, state.completions, state.currentYear);
+  }
+  els.calendar.classList.toggle('with-week-numbers', wn);
+  renderStreak(habit);
 }
 
 async function loadAndRenderAllCalendar() {
