@@ -837,49 +837,56 @@ button { font: inherit; color: inherit; }
   text-transform: uppercase;
 }
 
-/* Text-color picker — 4 presets + hex input + live preview tile that shows
-   the day number with the current habit color, texture choice, and text
-   color all composited together. */
-.text-color-row {
-  display: flex; align-items: center; gap: 6px;
-}
-.text-color-preset {
-  width: 26px; height: 26px;
-  border: 1px solid var(--border);
+/* Color target toggle — segmented control. The Box icon shows the current
+   habit color; the Text icon shows a tiny rendering of the day number with
+   the current text color over the current box color, so both buttons serve
+   as live previews of what they control. */
+.color-target-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.color-target-btn {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 4px;
   cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-  transition: transform .08s, border-color .12s;
+  transition: background .12s, color .12s, box-shadow .12s;
 }
-.text-color-preset:hover  { border-color: var(--text-dim); }
-.text-color-preset:active { transform: scale(.95); }
-.text-color-preset.is-selected {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.color-target-btn:hover { color: var(--text); }
+.color-target-btn.is-selected {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
 }
-.text-color-hex {
-  flex: 1; min-width: 0;
-  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
-  text-transform: uppercase;
-}
-.text-color-preview {
-  flex-shrink: 0;
-  width: 28px; height: 28px;
-  border-radius: var(--radius-sm);
-  background: var(--habit-color);
+.color-target-icon {
+  width: 20px; height: 20px;
+  border-radius: 3px;
   border: 1px solid var(--border);
+  flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700;
+  font-size: 11px; font-weight: 800;
+  line-height: 1;
 }
-.text-color-preview-num {
-  color: var(--habit-text-color, #ffffff);
+.color-target-icon-box  { background: var(--habit-color); }
+.color-target-icon-text {
+  background: var(--habit-color);
+  color: var(--habit-text-color, #fff);
   text-shadow:
     -1px -1px 0 #000,
      1px -1px 0 #000,
     -1px  1px 0 #000,
      1px  1px 0 #000;
-  line-height: 1;
 }
 
 /* Texture grid (5 columns, 5 rows) */

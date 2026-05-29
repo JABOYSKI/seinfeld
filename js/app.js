@@ -392,16 +392,6 @@ function openHabitDialog(existing = null) {
   const defaultTexture = normalizeTexture(existing?.texture);
   const defaultTextColor = normalizeTextColor(existing?.text_color);
 
-  // Live preview: a single tile that shows what a filled cell looks like
-  // with the current color + texture + text-color choices. Updates inline.
-  const PREVIEW_DAY_NUM = 26;
-  const TEXT_PRESETS = [
-    { hex: '#ffffff', label: 'White' },
-    { hex: '#000000', label: 'Black' },
-    { hex: '#bbbbbb', label: 'Light gray' },
-    { hex: '#555555', label: 'Dark gray' },
-  ];
-
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
@@ -412,21 +402,17 @@ function openHabitDialog(existing = null) {
         <input class="field" id="dlgName" maxlength="40" placeholder="e.g. Write 500 words" value="${escapeAttr(existing?.name || '')}" />
       </div>
       <div class="form-group">
-        <label>Color</label>
-        <div class="color-wheel-host" id="dlgWheel"></div>
-      </div>
-      <div class="form-group">
-        <label>Text color</label>
-        <div class="text-color-row">
-          ${TEXT_PRESETS.map(p => `
-            <button type="button" class="text-color-preset ${p.hex === defaultTextColor ? 'is-selected' : ''}"
-                    data-color="${p.hex}" style="background:${p.hex}" title="${p.label}"></button>
-          `).join('')}
-          <input type="text" class="field text-color-hex" id="dlgTextHex" maxlength="7" value="${defaultTextColor}" />
-          <span class="text-color-preview" id="dlgTextPreview">
-            <span class="text-color-preview-num">${PREVIEW_DAY_NUM}</span>
-          </span>
+        <div class="color-target-toggle" role="tablist">
+          <button type="button" class="color-target-btn is-selected" data-target="box" role="tab" aria-selected="true">
+            <span class="color-target-icon color-target-icon-box"></span>
+            <span>Box</span>
+          </button>
+          <button type="button" class="color-target-btn" data-target="text" role="tab" aria-selected="false">
+            <span class="color-target-icon color-target-icon-text">26</span>
+            <span>Text</span>
+          </button>
         </div>
+        <div class="color-wheel-host" id="dlgWheel"></div>
       </div>
       <div class="form-group">
         <label>Texture</label>
@@ -456,40 +442,41 @@ function openHabitDialog(existing = null) {
   let chosenColor = defaultColor;
   let chosenTexture = defaultTexture;
   let chosenTextColor = defaultTextColor;
+  let activeTarget = 'box';
 
   const nameEl = overlay.querySelector('#dlgName');
   const dlg = overlay.querySelector('.dialog-habit');
-  const textHexEl = overlay.querySelector('#dlgTextHex');
-  // Live CSS vars drive every texture swatch + the text-color preview tile,
-  // so they update in real time as the wheel moves or text color changes.
+  // Live CSS vars drive every texture swatch + the toggle's Text icon so
+  // they update in real time as the wheel moves or the target changes.
   dlg.style.setProperty('--habit-color', chosenColor);
   dlg.style.setProperty('--habit-text-color', chosenTextColor);
 
-  buildColorWheel(overlay.querySelector('#dlgWheel'), defaultColor, (hex) => {
-    chosenColor = hex;
-    dlg.style.setProperty('--habit-color', hex);
-  });
-
-  // Text-color picker handlers
-  function applyTextColor(hex, syncInput = true) {
-    const normalized = normalizeTextColor(hex);
-    chosenTextColor = normalized;
-    dlg.style.setProperty('--habit-text-color', normalized);
-    if (syncInput) textHexEl.value = normalized;
-    overlay.querySelectorAll('.text-color-preset').forEach(b =>
-      b.classList.toggle('is-selected', b.dataset.color.toLowerCase() === normalized)
-    );
-  }
-  overlay.querySelectorAll('.text-color-preset').forEach(btn => {
-    btn.addEventListener('click', () => applyTextColor(btn.dataset.color));
-  });
-  textHexEl.addEventListener('input', () => {
-    const v = textHexEl.value.trim();
-    if (/^#?[0-9a-fA-F]{6}$/.test(v) || /^#?[0-9a-fA-F]{3}$/.test(v)) {
-      applyTextColor(v.startsWith('#') ? v : '#' + v, /* syncInput= */ false);
+  // Single color wheel; its onChange routes to whichever target is active.
+  const wheel = buildColorWheel(overlay.querySelector('#dlgWheel'), chosenColor, (hex) => {
+    if (activeTarget === 'box') {
+      chosenColor = hex;
+      dlg.style.setProperty('--habit-color', hex);
+    } else {
+      chosenTextColor = normalizeTextColor(hex);
+      dlg.style.setProperty('--habit-text-color', chosenTextColor);
     }
   });
-  textHexEl.addEventListener('blur', () => { textHexEl.value = chosenTextColor; });
+
+  // Toggle swaps which target the wheel is editing — and refills the wheel
+  // with that target's current color so the user picks up where they left
+  // off on it. setHex doesn't fire onChange, so this is a clean swap.
+  const targetBtns = overlay.querySelectorAll('.color-target-btn');
+  targetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeTarget = btn.dataset.target;
+      targetBtns.forEach(b => {
+        const on = b === btn;
+        b.classList.toggle('is-selected', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      wheel.setHex(activeTarget === 'box' ? chosenColor : chosenTextColor);
+    });
+  });
 
   overlay.querySelector('#dlgTextures').addEventListener('click', (e) => {
     const tile = e.target.closest('.texture-tile');
