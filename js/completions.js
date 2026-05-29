@@ -4,8 +4,14 @@ import { supabase, withTimeout } from './supabase.js';
 // Load completed days for one habit in a given year. Returns a Set of
 // 'YYYY-MM-DD' strings — Set membership is O(1) per cell during render.
 export async function loadCompletions(habitId, year) {
-  const from = `${year}-01-01`;
-  const to   = `${year}-12-31`;
+  return loadCompletionsInRange(habitId, year, year);
+}
+
+// Same as loadCompletions but spans a multi-year window. Used by the
+// continuous strip view which renders 5 years at once.
+export async function loadCompletionsInRange(habitId, fromYear, toYear) {
+  const from = `${fromYear}-01-01`;
+  const to   = `${toYear}-12-31`;
   const { data, error } = await withTimeout(
     supabase
       .from('completions')
@@ -14,7 +20,7 @@ export async function loadCompletions(habitId, year) {
       .gte('day', from)
       .lte('day', to),
     8000,
-    'loadCompletions'
+    'loadCompletionsInRange'
   );
   if (error) throw error;
   return new Set((data || []).map(r => r.day));

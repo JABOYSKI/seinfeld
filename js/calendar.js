@@ -44,69 +44,86 @@ function applyHabitCSSVars(container, habit) {
   container.style.setProperty('--habit-text-color', habit.text_color || '#ffffff');
 }
 
+// Continuous-strip renders YEARS_TO_SHOW years ending at the viewed year, so
+// the user gets a long-range look at their consistency. completions must
+// cover the whole range — loadCompletionsInRange in completions.js.
+export const CONTINUOUS_YEARS = 5;
+
 export function renderContinuousCalendar(container, habit, completions, year) {
   const today = todayISO();
   const habitCreated = habit.created_at;
+  const startYear = year - (CONTINUOUS_YEARS - 1);
+  const endYear   = year;
 
+  let allCells = '';
+  let allMonthLabels = '';
+  let allYearLabels = '';
+  let runningCol = 0;
+
+  for (let yr = startYear; yr <= endYear; yr++) {
+    const ys = buildYearStrip(yr, habit, completions, today, habitCreated);
+    allCells += ys.cells;
+
+    // Month labels with absolute (cross-year) grid-column positions.
+    for (let i = 0; i < ys.monthStarts.length; i++) {
+      const { col, month } = ys.monthStarts[i];
+      const nextCol = ys.monthStarts[i + 1]?.col ?? ys.cols;
+      const span = Math.max(1, nextCol - col);
+      const cls = `strip-month-label${month === 0 ? ' is-year-start' : ''}`;
+      allMonthLabels += `<span class="${cls}" style="grid-column: ${runningCol + col + 1} / span ${span};">${MONTH_SHORT[month]}</span>`;
+    }
+
+    allYearLabels += `<span class="strip-year-label" style="grid-column: ${runningCol + 1} / span ${ys.cols};">${yr}</span>`;
+    runningCol += ys.cols;
+  }
+
+  const totalCols = runningCol;
+  const weekdays = WEEKDAY_LETTERS.map(l => `<span class="strip-weekday">${l}</span>`).join('');
+
+  container.innerHTML = `
+    <div class="strip-years"  style="grid-template-columns: repeat(${totalCols}, var(--strip-cell));">${allYearLabels}</div>
+    <div class="strip-months" style="grid-template-columns: repeat(${totalCols}, var(--strip-cell));">${allMonthLabels}</div>
+    <div class="strip-body">
+      <div class="strip-weekdays">${weekdays}</div>
+      <div class="strip-grid">${allCells}</div>
+    </div>
+  `;
+  applyHabitCSSVars(container, habit);
+  container.classList.add('calendar-continuous');
+  container.classList.remove('calendar-all');
+}
+
+// Builds the day cells + month-start col positions for one year. Used by the
+// continuous renderer to stitch together a multi-year strip.
+function buildYearStrip(year, habit, completions, today, habitCreated) {
   const jan1 = new Date(year, 0, 1);
   const jan1Weekday = jan1.getDay(); // 0 = Sun
   const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
   const daysInYear = isLeap ? 366 : 365;
 
   let cells = '';
-
   // Leading blanks so day 1 lands in the correct weekday row of column 1.
-  for (let i = 0; i < jan1Weekday; i++) {
-    cells += `<div class="day day-blank"></div>`;
-  }
+  for (let i = 0; i < jan1Weekday; i++) cells += `<div class="day day-blank"></div>`;
 
-  const monthStarts = []; // [{ col: 0-indexed, month: 0-indexed }]
+  const monthStarts = [];
   let weekCol = 0;
   let dayInWeek = jan1Weekday;
 
   for (let dayOfYear = 0; dayOfYear < daysInYear; dayOfYear++) {
     const d = new Date(year, 0, 1 + dayOfYear);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    if (d.getDate() === 1) {
-      monthStarts.push({ col: weekCol, month: d.getMonth() });
-    }
+    if (d.getDate() === 1) monthStarts.push({ col: weekCol, month: d.getMonth() });
     cells += renderDay(iso, d.getDate(), habit, completions, today, habitCreated);
     dayInWeek++;
     if (dayInWeek === 7) { dayInWeek = 0; weekCol++; }
   }
 
-  // Trailing blanks to complete the last week column.
   if (dayInWeek > 0) {
-    for (let i = dayInWeek; i < 7; i++) {
-      cells += `<div class="day day-blank"></div>`;
-    }
+    for (let i = dayInWeek; i < 7; i++) cells += `<div class="day day-blank"></div>`;
     weekCol++;
   }
 
-  const totalCols = weekCol;
-
-  // Month labels: each spans from its start column to the next month's start.
-  // grid-column is 1-indexed in CSS.
-  let labels = '';
-  for (let i = 0; i < monthStarts.length; i++) {
-    const { col, month } = monthStarts[i];
-    const nextCol = monthStarts[i + 1]?.col ?? totalCols;
-    const span = Math.max(1, nextCol - col);
-    labels += `<span class="strip-month-label" style="grid-column: ${col + 1} / span ${span};">${MONTH_SHORT[month]}</span>`;
-  }
-
-  const weekdays = WEEKDAY_LETTERS.map(l => `<span class="strip-weekday">${l}</span>`).join('');
-
-  container.innerHTML = `
-    <div class="strip-months" style="grid-template-columns: repeat(${totalCols}, var(--strip-cell));">${labels}</div>
-    <div class="strip-body">
-      <div class="strip-weekdays">${weekdays}</div>
-      <div class="strip-grid">${cells}</div>
-    </div>
-  `;
-  applyHabitCSSVars(container, habit);
-  container.classList.add('calendar-continuous');
-  container.classList.remove('calendar-all');
+  return { cells, monthStarts, cols: weekCol };
 }
 
 // ----- Conglomerate view --------------------------------------------------

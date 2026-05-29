@@ -3,8 +3,8 @@ import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js'
 import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS, DEFAULT_TEXT_COLOR, normalizeTextColor, migrationFileForColumn } from './habits.js';
 import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 import { buildColorWheel } from './colorWheel.js';
-import { loadCompletions, markDay, unmarkDay } from './completions.js';
-import { renderCalendar, renderAllCalendar, renderContinuousCalendar } from './calendar.js';
+import { loadCompletions, loadCompletionsInRange, markDay, unmarkDay } from './completions.js';
+import { renderCalendar, renderAllCalendar, renderContinuousCalendar, CONTINUOUS_YEARS } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
 
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
@@ -105,8 +105,15 @@ function renderShell() {
         <div class="header-spacer"></div>
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
+        <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${getViewMode() === 'months' ? '≡' : '▦'}</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
-        <button class="icon-btn" id="signoutBtn" title="Sign out">⎋</button>
+        <button class="icon-btn" id="signoutBtn" title="Sign out" aria-label="Sign out">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
       </div>
       <nav class="tabs" id="tabs"></nav>
     </header>
@@ -116,7 +123,6 @@ function renderShell() {
         <button class="icon-btn" id="yearPrev" title="Previous year">‹</button>
         <div class="year-label" id="yearLabel">${state.currentYear}</div>
         <button class="icon-btn" id="yearNext" title="Next year">›</button>
-        <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${getViewMode() === 'months' ? '≡' : '▦'}</button>
         <div class="header-spacer"></div>
         <div class="streak-chip" id="streakChip"></div>
       </div>
@@ -158,6 +164,7 @@ function renderShell() {
   viewToggle.addEventListener('click', () => {
     setViewMode(getViewMode() === 'months' ? 'continuous' : 'months');
     viewToggle.textContent = getViewMode() === 'months' ? '≡' : '▦';
+    updateYearLabel();
     if (state.currentHabitId) loadAndRenderCalendar();
   });
   els.calendar.addEventListener('click', onCalendarClick);
@@ -208,7 +215,7 @@ function renderTabs() {
   const tabs = state.habits.map(h => `
     <button class="tab ${h.id === state.currentHabitId ? 'tab-active' : ''}"
             data-habit="${h.id}"
-            style="--tab-color:${h.color}">
+            style="--tab-color:${h.color};--tab-text-color:${h.text_color || '#ffffff'}">
       <span class="tab-dot"></span>
       <span class="tab-name">${escapeHTML(h.name)}</span>
       <span class="tab-edit" data-edit="${h.id}" title="Edit habit">✎</span>
@@ -248,18 +255,30 @@ async function loadAndRenderCalendar() {
   }
   const habit = state.habits.find(h => h.id === state.currentHabitId);
   if (!habit) return;
+  const continuous = getViewMode() === 'continuous';
   try {
-    state.completions = await loadCompletions(habit.id, state.currentYear);
+    // Continuous view spans CONTINUOUS_YEARS years; months view is single-year.
+    state.completions = continuous
+      ? await loadCompletionsInRange(habit.id, state.currentYear - (CONTINUOUS_YEARS - 1), state.currentYear)
+      : await loadCompletions(habit.id, state.currentYear);
   } catch (e) {
     toast(`Failed to load days: ${e.message}`, 'error');
     state.completions = new Set();
   }
-  if (getViewMode() === 'continuous') {
+  if (continuous) {
     renderContinuousCalendar(els.calendar, habit, state.completions, state.currentYear);
   } else {
     renderCalendar(els.calendar, habit, state.completions, state.currentYear);
   }
+  updateYearLabel();
   renderStreak(habit);
+}
+
+function updateYearLabel() {
+  if (!els.yearLabel) return;
+  els.yearLabel.textContent = getViewMode() === 'continuous'
+    ? `${state.currentYear - (CONTINUOUS_YEARS - 1)}–${state.currentYear}`
+    : String(state.currentYear);
 }
 
 async function loadAndRenderAllCalendar() {
@@ -329,7 +348,7 @@ function renderAllSummary() {
 
 function changeYear(delta) {
   state.currentYear += delta;
-  els.yearLabel.textContent = state.currentYear;
+  updateYearLabel();
   if (state.currentHabitId) loadAndRenderCalendar();
 }
 
