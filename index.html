@@ -4,10 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f1115" />
-  <meta name="description" content="Seinfeld — a yearly wall-calendar habit tracker. Pick a habit, show up every day, fill the box. Don't break the chain." />
-  <title>Seinfeld — don't break the chain</title>
+  <meta name="description" content="SEINFELD — a yearly wall-calendar habit tracker. Pick a habit, show up every day, fill the box. Don't break the chain." />
+  <title>SEINFELD — don't break the chain</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📅</text></svg>" />
+  <!-- Favicon: same line-art calendar as the in-app banner, but in brand red
+       (#ff5a5f) with a thicker stroke so it stays legible at 16/32 px. -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23ff5a5f%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><rect x=%223%22 y=%225%22 width=%2218%22 height=%2218%22 rx=%222%22/><line x1=%223%22 y1=%2210%22 x2=%2221%22 y2=%2210%22/><line x1=%227%22 y1=%222%22 x2=%227%22 y2=%227%22/><line x1=%2217%22 y1=%222%22 x2=%2217%22 y2=%227%22/></svg>" />
 
   <!-- Inline theme bootstrap: read stored choice and apply BEFORE first paint
        so we don't flash the wrong theme. Mirrors the pattern in fubzlifts. -->
@@ -20,18 +22,18 @@
         }
         document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
-      window.SEIN_BUILD_TIME = '2026-05-29T08:58:10Z';
+      window.SEIN_BUILD_TIME = '2026-05-29T09:02:18Z';
     })();
   </script>
 
-  <link rel="stylesheet" href="css/styles.css?v=2026-05-29T08:58:10Z" />
+  <link rel="stylesheet" href="css/styles.css?v=2026-05-29T09:02:18Z" />
   <!-- animations.css and textures.css are not needed for the splash/auth
        paint, so defer them via the rel=preload "swap-onload" trick. Cuts
        render-blocking weight by ~9 KiB on first paint. -->
-  <link rel="preload" href="css/animations.css?v=2026-05-29T08:58:10Z" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link rel="stylesheet" href="css/animations.css?v=2026-05-29T08:58:10Z" /></noscript>
-  <link rel="preload" href="css/textures.css?v=2026-05-29T08:58:10Z" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-  <noscript><link rel="stylesheet" href="css/textures.css?v=2026-05-29T08:58:10Z" /></noscript>
+  <link rel="preload" href="css/animations.css?v=2026-05-29T09:02:18Z" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="css/animations.css?v=2026-05-29T09:02:18Z" /></noscript>
+  <link rel="preload" href="css/textures.css?v=2026-05-29T09:02:18Z" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link rel="stylesheet" href="css/textures.css?v=2026-05-29T09:02:18Z" /></noscript>
 </head>
 <body>
   <!-- Boot splash covers the page until JS init completes, so users never see
@@ -45,7 +47,7 @@
     <div id="app" hidden></div>
   </main>
 
-  <script type="module" src="js/app.js?v=2026-05-29T08:58:10Z"></script>
+  <script type="module" src="js/app.js?v=2026-05-29T09:02:18Z"></script>
 
   <!-- Service worker (PWA / offline shell). Failure is non-fatal. -->
   <script>
