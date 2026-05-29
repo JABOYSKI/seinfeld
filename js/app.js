@@ -1,6 +1,8 @@
 // Main controller — boots, routes auth vs tracker, owns app state.
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
 import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS } from './habits.js';
+import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
+import { buildColorWheel } from './colorWheel.js';
 import { loadCompletions, markDay, unmarkDay } from './completions.js';
 import { renderCalendar, renderAllCalendar, renderContinuousCalendar } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
@@ -387,11 +389,12 @@ function openHabitDialog(existing = null) {
   const isEdit = !!existing;
   const used = new Set(state.habits.filter(h => !isEdit || h.id !== existing.id).map(h => h.color));
   const defaultColor = existing?.color || COLORS.find(c => !used.has(c)) || COLORS[0];
+  const defaultTexture = normalizeTexture(existing?.texture);
 
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
-    <div class="dialog" role="dialog" aria-modal="true">
+    <div class="dialog dialog-habit" role="dialog" aria-modal="true">
       <h2>${isEdit ? 'Edit habit' : 'New habit'}</h2>
       <div class="form-group">
         <label for="dlgName">Name</label>
@@ -399,8 +402,20 @@ function openHabitDialog(existing = null) {
       </div>
       <div class="form-group">
         <label>Color</label>
-        <div class="color-row" id="dlgColors">
-          ${COLORS.map(c => `<button type="button" class="color-swatch ${c === defaultColor ? 'is-selected' : ''}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join('')}
+        <div class="color-wheel-host" id="dlgWheel"></div>
+      </div>
+      <div class="form-group">
+        <label>Texture</label>
+        <div class="texture-grid" id="dlgTextures">
+          ${TEXTURES.map(t => `
+            <button type="button"
+                    class="texture-tile ${t.id === defaultTexture ? 'is-selected' : ''}"
+                    data-texture="${t.id}"
+                    title="${t.blurb}">
+              <span class="texture-swatch tx-${t.id}"></span>
+              <span class="texture-label">${t.name}</span>
+            </button>
+          `).join('')}
         </div>
       </div>
       ${isEdit ? `<p class="dlg-meta">Chain started ${existing.created_at}</p>` : ''}
@@ -415,15 +430,27 @@ function openHabitDialog(existing = null) {
   document.body.appendChild(overlay);
 
   let chosenColor = defaultColor;
-  const nameEl = overlay.querySelector('#dlgName');
-  nameEl.focus();
+  let chosenTexture = defaultTexture;
 
-  overlay.querySelector('#dlgColors').addEventListener('click', (e) => {
-    const sw = e.target.closest('.color-swatch');
-    if (!sw) return;
-    chosenColor = sw.dataset.color;
-    overlay.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('is-selected', s === sw));
+  const nameEl = overlay.querySelector('#dlgName');
+  const dlg = overlay.querySelector('.dialog-habit');
+  // Live --habit-color drives every texture swatch in this dialog, so they
+  // update in sync when the color wheel moves.
+  dlg.style.setProperty('--habit-color', chosenColor);
+
+  buildColorWheel(overlay.querySelector('#dlgWheel'), defaultColor, (hex) => {
+    chosenColor = hex;
+    dlg.style.setProperty('--habit-color', hex);
   });
+
+  overlay.querySelector('#dlgTextures').addEventListener('click', (e) => {
+    const tile = e.target.closest('.texture-tile');
+    if (!tile) return;
+    chosenTexture = tile.dataset.texture;
+    overlay.querySelectorAll('.texture-tile').forEach(t => t.classList.toggle('is-selected', t === tile));
+  });
+
+  nameEl.focus();
 
   const close = () => overlay.remove();
   overlay.querySelector('#dlgCancel').addEventListener('click', close);
@@ -434,12 +461,17 @@ function openHabitDialog(existing = null) {
     if (!name) { toast('Give it a name.', 'error'); return; }
     try {
       if (isEdit) {
-        const updated = await updateHabit(existing.id, { name, color: chosenColor });
+        const fields = { name, color: chosenColor };
+        // Only send texture if it's been customised — keeps the update
+        // compatible with the old schema (pre-migration 002), where the
+        // column doesn't exist.
+        if (chosenTexture !== DEFAULT_TEXTURE_ID || existing.texture) fields.texture = chosenTexture;
+        const updated = await updateHabit(existing.id, fields);
         Object.assign(existing, updated);
         renderTabs();
         if (existing.id === state.currentHabitId) await loadAndRenderCalendar();
       } else {
-        const created = await createHabit(getUser().id, name, chosenColor);
+        const created = await createHabit(getUser().id, name, chosenColor, chosenTexture);
         state.habits.push(created);
         state.currentHabitId = created.id;
         renderTabs();

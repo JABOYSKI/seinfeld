@@ -8,6 +8,7 @@ import {
   daysInMonth, firstWeekdayOfMonth,
   todayISO, canEditDay, daysBetween,
 } from './utils.js';
+import { normalizeTexture } from './textures.js';
 
 // ----- Single-habit (existing) view ---------------------------------------
 
@@ -165,7 +166,10 @@ function renderDay(iso, dayNum, habit, completions, today, habitCreated) {
   const isToday = iso === today;
 
   const classes = ['day'];
-  if (done) classes.push('day-done');
+  if (done) {
+    classes.push('day-done');
+    classes.push(`tx-${normalizeTexture(habit.texture)}`);
+  }
   if (future) classes.push('day-future');
   if (preCreation) classes.push('day-pre');
   if (editable) classes.push('day-clickable');
@@ -222,9 +226,10 @@ function renderAllDay(iso, dayNum, habits, completionsByHabit, today) {
     if (doneNames.length) title += `\n${doneNames.join(', ')}`;
   }
 
-  const slicesHTML = slices.map(s =>
-    `<span class="day-slice${s.done ? ' day-slice-done' : ''}${s.existed ? '' : ' day-slice-pre'}" style="--c:${s.habit.color}"></span>`
-  ).join('');
+  const slicesHTML = slices.map(s => {
+    const txClass = s.done ? ` tx-${normalizeTexture(s.habit.texture)}` : '';
+    return `<span class="day-slice${s.done ? ' day-slice-done' : ''}${s.existed ? '' : ' day-slice-pre'}${txClass}" style="--c:${s.habit.color}"></span>`;
+  }).join('');
 
   return `<div class="${classes.join(' ')}" data-day="${iso}" title="${title}">
     <span class="day-slices">${slicesHTML}</span>

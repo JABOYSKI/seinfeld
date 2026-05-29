@@ -1,6 +1,7 @@
 // Habit CRUD
 import { supabase, withTimeout } from './supabase.js';
 import { todayISO } from './utils.js';
+import { DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 
 // Palette offered when creating/editing a habit. Picked for distinct hues
 // that read well as solid-filled day cells against both light and dark.
@@ -31,7 +32,7 @@ export async function loadHabits(userId) {
   return data || [];
 }
 
-export async function createHabit(userId, name, color) {
+export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE_ID) {
   // Place new habit at the end. Cheap to compute client-side because the
   // user can only have a handful of habits (capped at 5 in UI).
   const existing = await loadHabits(userId);
@@ -41,10 +42,15 @@ export async function createHabit(userId, name, color) {
   // user west of UTC after their local 5pm-ish — that future date then
   // locks every cell with "habit didn't exist yet."
   const created_at = todayISO();
+  const row = { user_id: userId, name, color, sort_order, created_at };
+  // Only send texture if it's been customised — keeps insert compatible with
+  // the old schema (pre-migration 002), where the column doesn't exist.
+  const tx = normalizeTexture(texture);
+  if (tx !== DEFAULT_TEXTURE_ID) row.texture = tx;
   const { data, error } = await withTimeout(
     supabase
       .from('habits')
-      .insert({ user_id: userId, name, color, sort_order, created_at })
+      .insert(row)
       .select()
       .single(),
     8000,

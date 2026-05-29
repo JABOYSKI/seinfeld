@@ -1,12 +1,13 @@
 // Service worker — app shell cache only.
 // Versioned cache name is stamped by deploy.bat on every deploy so browsers
 // pick up new assets without manual cache-clearing.
-const CACHE = 'seinfeld-2026-05-28T20:40:28Z';
+const CACHE = 'seinfeld-2026-05-29T06:12:30Z';
 const SHELL = [
   './',
   './index.html',
   './css/styles.css',
   './css/animations.css',
+  './css/textures.css',
   './js/app.js',
   './js/animationPicker.js',
   './js/auth.js',
@@ -14,11 +15,13 @@ const SHELL = [
   './js/chainAnimations.js',
   './js/chainBuild.js',
   './js/chainPicker.js',
+  './js/colorWheel.js',
   './js/completions.js',
   './js/fillAnimations.js',
   './js/habits.js',
   './js/streak.js',
   './js/supabase.js',
+  './js/textures.js',
   './js/theme.js',
   './js/utils.js',
   './js/version.js',

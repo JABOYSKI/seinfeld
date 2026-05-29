@@ -1,0 +1,258 @@
+/* ===========================================================================
+   25 textures — applied to filled day cells (and conglomerate slices) via
+   .tx-<id> classes. Each one composes from var(--habit-color), so the same
+   texture reads correctly across every color the user picks.
+
+   Naming convention: .tx-matte, .tx-metallic, etc. Cells with no texture
+   class fall back to the previous behavior (solid var(--habit-color)).
+
+   These rules use the same selectors that already match filled state:
+   .day-done.tx-X for single view, .day-slice-done.tx-X for All view.
+   --------------------------------------------------------------------------- */
+
+/* Use a custom property so single-view cells (.day-done -> var(--habit-color))
+   and All-view slices (.day-slice-done -> var(--c)) can both feed the same
+   texture rules without each texture needing two variants. */
+.day-done       { --tx-c: var(--habit-color); }
+.day-slice-done { --tx-c: var(--c); }
+
+/* 1. Matte — flat solid (default; explicit so picker preview can opt in) */
+.tx-matte { background: var(--tx-c); }
+
+/* 2. Metallic — diagonal sheen, lighter top-left to darker bottom-right */
+.tx-metallic {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--tx-c) 50%, white) 0%,
+    var(--tx-c) 45%,
+    color-mix(in srgb, var(--tx-c) 65%, black) 100%);
+}
+
+/* 3. Glossy — top white highlight, faint bottom shadow */
+.tx-glossy {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.45) 0%,
+      rgba(255,255,255,0.05) 45%,
+      transparent 55%,
+      rgba(0,0,0,0.18) 100%),
+    var(--tx-c);
+}
+
+/* 4. Velvet — soft radial with darker edges */
+.tx-velvet {
+  background: radial-gradient(ellipse at center,
+    color-mix(in srgb, var(--tx-c) 85%, white) 0%,
+    var(--tx-c) 55%,
+    color-mix(in srgb, var(--tx-c) 75%, black) 100%);
+}
+
+/* 5. Pearl — multi-stop iridescent with white shimmer */
+.tx-pearl {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--tx-c) 55%, white) 0%,
+    var(--tx-c) 25%,
+    color-mix(in srgb, var(--tx-c) 65%, white) 55%,
+    var(--tx-c) 75%,
+    color-mix(in srgb, var(--tx-c) 80%, white) 100%);
+}
+
+/* 6. Brushed — fine diagonal lines simulate brushed metal */
+.tx-brushed {
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(255,255,255,0.12) 0px,
+      rgba(255,255,255,0.12) 1px,
+      transparent 1px, transparent 3px),
+    repeating-linear-gradient(135deg,
+      rgba(0,0,0,0.08) 0px,
+      rgba(0,0,0,0.08) 1px,
+      transparent 1px, transparent 4px),
+    var(--tx-c);
+}
+
+/* 7. Glitter — small bright dots scattered across */
+.tx-glitter {
+  background:
+    radial-gradient(circle at 20% 25%, rgba(255,255,255,0.85) 0.5px, transparent 1.2px),
+    radial-gradient(circle at 75% 70%, rgba(255,255,255,0.7)  0.5px, transparent 1.2px),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.55) 0.5px, transparent 1px),
+    var(--tx-c);
+  background-size: 7px 7px, 5px 5px, 11px 11px, 100% 100%;
+}
+
+/* 8. Neon — flat fill plus inner highlight and outer glow */
+.tx-neon {
+  background: var(--tx-c);
+  box-shadow:
+    inset 0 0 4px color-mix(in srgb, var(--tx-c) 60%, white),
+    0 0 6px color-mix(in srgb, var(--tx-c) 70%, transparent);
+}
+
+/* 9. Embossed — raised, with light from top-left */
+.tx-embossed {
+  background: var(--tx-c);
+  box-shadow:
+    inset 1px 1px 2px rgba(255,255,255,0.45),
+    inset -1px -1px 2px rgba(0,0,0,0.32);
+}
+
+/* 10. Crystal — conic gradient suggesting cut facets */
+.tx-crystal {
+  background: conic-gradient(from 45deg at 50% 50%,
+    color-mix(in srgb, var(--tx-c) 65%, white),
+    var(--tx-c),
+    color-mix(in srgb, var(--tx-c) 75%, black),
+    var(--tx-c),
+    color-mix(in srgb, var(--tx-c) 65%, white));
+}
+
+/* 11. Watercolor — soft asymmetric wash */
+.tx-watercolor {
+  background:
+    radial-gradient(circle at 25% 30%, color-mix(in srgb, var(--tx-c) 85%, white) 0%, transparent 60%),
+    radial-gradient(circle at 75% 75%, color-mix(in srgb, var(--tx-c) 80%, black) 0%, transparent 70%),
+    var(--tx-c);
+}
+
+/* 12. Holographic — hue shifts blended into the base */
+.tx-holographic {
+  background: linear-gradient(135deg,
+    var(--tx-c) 0%,
+    color-mix(in srgb, var(--tx-c) 55%, cyan) 25%,
+    color-mix(in srgb, var(--tx-c) 55%, magenta) 50%,
+    color-mix(in srgb, var(--tx-c) 55%, yellow) 75%,
+    var(--tx-c) 100%);
+}
+
+/* 13. Chrome — very high contrast metallic top→bottom */
+.tx-chrome {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.85) 0%,
+    color-mix(in srgb, var(--tx-c) 50%, white) 15%,
+    var(--tx-c) 50%,
+    color-mix(in srgb, var(--tx-c) 70%, black) 85%,
+    rgba(0,0,0,0.55) 100%);
+}
+
+/* 14. Sandstone — speckled grain dots */
+.tx-sandstone {
+  background:
+    radial-gradient(circle at 12% 22%, rgba(0,0,0,0.18) 0.4px, transparent 1px),
+    radial-gradient(circle at 62% 68%, rgba(0,0,0,0.18) 0.4px, transparent 1px),
+    radial-gradient(circle at 32% 85%, rgba(0,0,0,0.18) 0.4px, transparent 1px),
+    radial-gradient(circle at 85% 30%, rgba(255,255,255,0.15) 0.4px, transparent 1px),
+    var(--tx-c);
+  background-size: 5px 5px, 6px 6px, 7px 7px, 4px 4px, 100% 100%;
+}
+
+/* 15. Frosted — milky overlay */
+.tx-frosted {
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,0.4) 0%,
+      rgba(255,255,255,0.15) 50%,
+      rgba(255,255,255,0.05) 100%),
+    var(--tx-c);
+}
+
+/* 16. Lava — molten bright spots over a deeper base */
+.tx-lava {
+  background:
+    radial-gradient(circle at 35% 40%, color-mix(in srgb, var(--tx-c) 40%, white) 0%, transparent 45%),
+    radial-gradient(circle at 70% 70%, color-mix(in srgb, var(--tx-c) 55%, white) 0%, transparent 55%),
+    color-mix(in srgb, var(--tx-c) 80%, black);
+}
+
+/* 17. Marble — veins approximated with crossing soft strokes */
+.tx-marble {
+  background:
+    linear-gradient(38deg,
+      transparent 38%,
+      color-mix(in srgb, var(--tx-c) 60%, white) 49%,
+      color-mix(in srgb, var(--tx-c) 60%, white) 51%,
+      transparent 62%),
+    linear-gradient(118deg,
+      transparent 55%,
+      color-mix(in srgb, var(--tx-c) 70%, white) 67%,
+      transparent 75%),
+    var(--tx-c);
+}
+
+/* 18. Carbon — cross-hatch weave */
+.tx-carbon {
+  background:
+    repeating-linear-gradient( 45deg, rgba(0,0,0,0.22) 0px 1px, transparent 1px 3px),
+    repeating-linear-gradient(-45deg, rgba(0,0,0,0.22) 0px 1px, transparent 1px 3px),
+    var(--tx-c);
+}
+
+/* 19. Liquid — glossy with a wet highlight + bottom shadow */
+.tx-liquid {
+  background:
+    radial-gradient(ellipse at 30% 25%, rgba(255,255,255,0.55) 0%, transparent 35%),
+    radial-gradient(circle  at 75% 80%, color-mix(in srgb, var(--tx-c) 65%, black) 0%, transparent 55%),
+    var(--tx-c);
+}
+
+/* 20. Plasma — energetic multi-radial */
+.tx-plasma {
+  background:
+    radial-gradient(circle at 25% 25%, color-mix(in srgb, var(--tx-c) 45%, white) 0%, transparent 40%),
+    radial-gradient(circle at 75% 55%, color-mix(in srgb, var(--tx-c) 55%, magenta) 0%, transparent 50%),
+    radial-gradient(circle at 50% 90%, color-mix(in srgb, var(--tx-c) 50%, cyan) 0%, transparent 45%),
+    var(--tx-c);
+}
+
+/* 21. Foil — crinkled, angular metallic */
+.tx-foil {
+  background: linear-gradient(62deg,
+    color-mix(in srgb, var(--tx-c) 35%, white) 0%,
+    var(--tx-c) 18%,
+    color-mix(in srgb, var(--tx-c) 55%, white) 38%,
+    var(--tx-c) 56%,
+    color-mix(in srgb, var(--tx-c) 70%, black) 78%,
+    var(--tx-c) 100%);
+}
+
+/* 22. Suede — slightly darkened edges, soft center */
+.tx-suede {
+  background:
+    radial-gradient(ellipse at center,
+      var(--tx-c) 45%,
+      color-mix(in srgb, var(--tx-c) 80%, black) 100%);
+}
+
+/* 23. Diamond — four-way conic facets */
+.tx-diamond {
+  background: conic-gradient(from 0deg at 50% 50%,
+    color-mix(in srgb, var(--tx-c) 55%, white) 0deg,
+    var(--tx-c) 45deg,
+    color-mix(in srgb, var(--tx-c) 75%, black) 90deg,
+    var(--tx-c) 135deg,
+    color-mix(in srgb, var(--tx-c) 55%, white) 180deg,
+    var(--tx-c) 225deg,
+    color-mix(in srgb, var(--tx-c) 75%, black) 270deg,
+    var(--tx-c) 315deg,
+    color-mix(in srgb, var(--tx-c) 55%, white) 360deg);
+}
+
+/* 24. Stardust — fine bright pinpoint specks */
+.tx-stardust {
+  background:
+    radial-gradient(circle at 15% 25%, rgba(255,255,255,0.85) 0.4px, transparent 0.9px),
+    radial-gradient(circle at 80% 40%, rgba(255,255,255,0.65) 0.4px, transparent 0.9px),
+    radial-gradient(circle at 50% 70%, rgba(255,255,255,0.75) 0.4px, transparent 0.9px),
+    radial-gradient(circle at 30% 85%, rgba(255,255,255,0.55) 0.4px, transparent 0.9px),
+    var(--tx-c);
+  background-size: 13px 13px, 11px 11px, 15px 15px, 10px 10px, 100% 100%;
+}
+
+/* 25. Smoke — soft wispy fade */
+.tx-smoke {
+  background:
+    radial-gradient(ellipse at 30% 50%, color-mix(in srgb, var(--tx-c) 55%, white) 0%, transparent 35%),
+    radial-gradient(ellipse at 70% 30%, color-mix(in srgb, var(--tx-c) 55%, black) 0%, transparent 40%),
+    var(--tx-c);
+}
+
+/* Reduce-motion users still see textures — they're static, no animation. */
