@@ -14,11 +14,18 @@
   --border-light:  #232a36;
   --text:          #ecedef;
   --text-dim:      #9aa3b2;
-  --text-faint:    #5d6573;
+  /* Brightened from #5d6573 to meet WCAG AA on --panel — old value was 2.78,
+     new is ~5.0 on the dark panel bg used in splashes and dialogs. */
+  --text-faint:    #8a93a3;
 
   --accent:        #ff5a5f;        /* red, the seinfeld X color */
   --accent-hover:  #ff7479;
   --accent-text:   #ffffff;
+  /* Primary-button bg uses a darker red so the white-on-red label passes
+     WCAG AA. --accent stays vivid for outlines/dots/marks where contrast
+     doesn't matter. (White on #ff5a5f is 3.05; on #d9322a it's 4.57.) */
+  --btn-primary-bg: #d9322a;
+  --btn-primary-bg-hover: #b3271f;
 
   --danger:        #c0392b;
   --danger-text:   #f87171;
@@ -45,11 +52,14 @@
   --border-light:  #e9e3d6;
   --text:          #1c1d20;
   --text-dim:      #5b6068;
-  --text-faint:    #9aa0aa;
+  /* Darkened from #9aa0aa to meet WCAG AA on white --panel — was 2.56, now ~5.0. */
+  --text-faint:    #6d7380;
 
   --accent:        #d9322a;
   --accent-hover:  #b9281f;
   --accent-text:   #ffffff;
+  --btn-primary-bg: #d9322a;
+  --btn-primary-bg-hover: #b3271f;
 
   --danger:        #b92e21;
   --danger-text:   #b92e21;
@@ -112,12 +122,15 @@ button { font: inherit; color: inherit; }
 .btn[disabled]:active { transform: none; }
 
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
   color: var(--accent-text);
   font-weight: 700;
 }
-.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-primary:hover {
+  background: var(--btn-primary-bg-hover);
+  border-color: var(--btn-primary-bg-hover);
+}
 
 .btn-danger {
   background: transparent;
