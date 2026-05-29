@@ -4,7 +4,7 @@ import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedD
 import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 import { buildColorWheel } from './colorWheel.js';
 import { loadCompletions, loadCompletionsInRange, markDay, unmarkDay } from './completions.js';
-import { renderCalendar, renderAllCalendar, renderContinuousCalendar, CONTINUOUS_YEARS } from './calendar.js';
+import { renderCalendar, renderAllCalendar, renderContinuousCalendar, renderContinuousAllCalendar, CONTINUOUS_YEARS } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
 
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
@@ -314,10 +314,15 @@ function updateYearLabel() {
 
 async function loadAndRenderAllCalendar() {
   // Fire all per-habit fetches in parallel — small N (max 5) keeps this cheap.
+  // Continuous mode spans CONTINUOUS_YEARS years starting at currentYear,
+  // matching single-habit continuous behavior.
+  const continuous = getViewMode() === 'continuous';
+  const fromYear = state.currentYear;
+  const toYear   = continuous ? state.currentYear + (CONTINUOUS_YEARS - 1) : state.currentYear;
   try {
     const results = await Promise.all(
       state.habits.map(h =>
-        loadCompletions(h.id, state.currentYear).then(set => [h.id, set])
+        loadCompletionsInRange(h.id, fromYear, toYear).then(set => [h.id, set])
       )
     );
     state.completionsByHabit = new Map(results);
@@ -325,7 +330,11 @@ async function loadAndRenderAllCalendar() {
     toast(`Failed to load days: ${e.message}`, 'error');
     state.completionsByHabit = new Map();
   }
-  renderAllCalendar(els.calendar, state.habits, state.completionsByHabit, state.currentYear);
+  if (continuous) {
+    renderContinuousAllCalendar(els.calendar, state.habits, state.completionsByHabit, state.currentYear);
+  } else {
+    renderAllCalendar(els.calendar, state.habits, state.completionsByHabit, state.currentYear);
+  }
   renderAllSummary();
 }
 
@@ -345,20 +354,22 @@ function renderStreak(habit) {
 function renderAllSummary() {
   // "Perfect days" = days where every habit that existed by that date got
   // its slice filled. Most useful metric in the conglomerate view because it
-  // rewards consistency across the whole portfolio.
+  // rewards consistency across the whole portfolio. In continuous mode we
+  // count across the whole 5-year window the user is looking at.
+  const continuous = getViewMode() === 'continuous';
+  const startYear = state.currentYear;
+  const endYear   = continuous ? state.currentYear + (CONTINUOUS_YEARS - 1) : state.currentYear;
   const today = todayISO();
-  const year = state.currentYear;
   let perfectDays = 0;
   let totalFills = 0;
   for (const [, set] of state.completionsByHabit) totalFills += set.size;
 
-  // Walk each day from year start to today (or year end) counting perfect days.
-  const yearStart = new Date(year, 0, 1);
-  const yearEnd   = new Date(year, 11, 31);
-  const stop      = todayISO() < `${year}-01-01` ? yearStart
-                  : todayISO() > `${year}-12-31` ? yearEnd
-                  : new Date();
-  for (let d = new Date(yearStart); d <= stop; d.setDate(d.getDate() + 1)) {
+  const rangeStart = new Date(startYear, 0, 1);
+  const rangeEnd   = new Date(endYear, 11, 31);
+  const stop = today < `${startYear}-01-01` ? rangeStart
+             : today > `${endYear}-12-31`   ? rangeEnd
+             : new Date();
+  for (let d = new Date(rangeStart); d <= stop; d.setDate(d.getDate() + 1)) {
     const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     let existing = 0, done = 0;
     for (const h of state.habits) {

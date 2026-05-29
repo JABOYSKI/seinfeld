@@ -12,6 +12,13 @@ import { normalizeTexture } from './textures.js';
 
 // ----- Single-habit (existing) view ---------------------------------------
 
+// Sets exactly the layout-mode classes the active renderer needs, stripping
+// the others. Avoids leftover classes when toggling between views.
+function setCalendarLayout(container, classes) {
+  ['calendar-all', 'calendar-continuous'].forEach(c => container.classList.remove(c));
+  classes.forEach(c => container.classList.add(c));
+}
+
 export function renderCalendar(container, habit, completions, year) {
   const today = todayISO();
   const habitCreated = habit.created_at;
@@ -24,9 +31,8 @@ export function renderCalendar(container, habit, completions, year) {
   }
 
   container.innerHTML = html;
-  container.style.setProperty('--habit-color', habit.color);
-  container.style.setProperty('--habit-text-color', habit.text_color || '#ffffff');
-  container.classList.remove('calendar-all', 'calendar-continuous');
+  applyHabitCSSVars(container, habit);
+  setCalendarLayout(container, []);
 }
 
 // ----- Continuous strip view ----------------------------------------------
@@ -64,16 +70,26 @@ export function renderContinuousCalendar(container, habit, completions, year) {
 
   container.innerHTML = blocks;
   applyHabitCSSVars(container, habit);
-  container.classList.add('calendar-continuous');
-  container.classList.remove('calendar-all');
+  setCalendarLayout(container, ['calendar-continuous']);
 }
 
 // One self-contained year strip — header + month labels + weekday gutter +
-// 7-row day grid. The CONTINUOUS_YEARS of these stack vertically in the
-// container so the user reads each year as its own row of cells.
+// 7-row day grid. CONTINUOUS_YEARS of these stack vertically in the container.
 function renderYearBlock(yr, habit, completions, today, habitCreated) {
-  const ys = buildYearStrip(yr, habit, completions, today, habitCreated);
+  const ys = buildYearStrip(yr, (iso, dayNum) =>
+    renderDay(iso, dayNum, habit, completions, today, habitCreated)
+  );
+  return wrapYearBlock(yr, ys);
+}
 
+function renderYearBlockAll(yr, habits, completionsByHabit, today) {
+  const ys = buildYearStrip(yr, (iso, dayNum) =>
+    renderAllDay(iso, dayNum, habits, completionsByHabit, today)
+  );
+  return wrapYearBlock(yr, ys);
+}
+
+function wrapYearBlock(yr, ys) {
   let labels = '';
   for (let i = 0; i < ys.monthStarts.length; i++) {
     const { col, month } = ys.monthStarts[i];
@@ -81,9 +97,7 @@ function renderYearBlock(yr, habit, completions, today, habitCreated) {
     const span = Math.max(1, nextCol - col);
     labels += `<span class="strip-month-label" style="grid-column: ${col + 1} / span ${span};">${MONTH_SHORT[month]}</span>`;
   }
-
   const weekdays = WEEKDAY_LETTERS.map(l => `<span class="strip-weekday">${l}</span>`).join('');
-
   return `
     <div class="strip-year-block">
       <div class="strip-year-header">${yr}</div>
@@ -96,9 +110,10 @@ function renderYearBlock(yr, habit, completions, today, habitCreated) {
   `;
 }
 
-// Builds the day cells + month-start col positions for one year. Used by the
-// continuous renderer to stitch together a multi-year strip.
-function buildYearStrip(year, habit, completions, today, habitCreated) {
+// Builds the day cells + month-start col positions for one year. Takes a
+// per-cell renderer callback so the same scaffolding works for single-habit
+// (renderDay) and all-habits (renderAllDay) cells.
+function buildYearStrip(year, renderCell) {
   const jan1 = new Date(year, 0, 1);
   const jan1Weekday = jan1.getDay(); // 0 = Sun
   const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
@@ -116,7 +131,7 @@ function buildYearStrip(year, habit, completions, today, habitCreated) {
     const d = new Date(year, 0, 1 + dayOfYear);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if (d.getDate() === 1) monthStarts.push({ col: weekCol, month: d.getMonth() });
-    cells += renderDay(iso, d.getDate(), habit, completions, today, habitCreated);
+    cells += renderCell(iso, d.getDate());
     dayInWeek++;
     if (dayInWeek === 7) { dayInWeek = 0; weekCol++; }
   }
@@ -146,7 +161,24 @@ export function renderAllCalendar(container, habits, completionsByHabit, year) {
   container.innerHTML = html;
   // Use the first habit's color as the --habit-color fallback (for hover etc).
   container.style.setProperty('--habit-color', habits[0]?.color || 'var(--accent)');
-  container.classList.add('calendar-all');
+  setCalendarLayout(container, ['calendar-all']);
+}
+
+// All-habits continuous: same stacked-year layout as single-habit, but each
+// day cell renders as N sliced stripes (one per habit).
+export function renderContinuousAllCalendar(container, habits, completionsByHabit, year) {
+  const today = todayISO();
+  const startYear = year;
+  const endYear   = year + (CONTINUOUS_YEARS - 1);
+
+  let blocks = '';
+  for (let yr = startYear; yr <= endYear; yr++) {
+    blocks += renderYearBlockAll(yr, habits, completionsByHabit, today);
+  }
+
+  container.innerHTML = blocks;
+  container.style.setProperty('--habit-color', habits[0]?.color || 'var(--accent)');
+  setCalendarLayout(container, ['calendar-all', 'calendar-continuous']);
 }
 
 // ----- Shared month scaffolding -------------------------------------------
