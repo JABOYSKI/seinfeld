@@ -32,7 +32,20 @@ export async function loadHabits(userId) {
   return data || [];
 }
 
-export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE_ID) {
+export const DEFAULT_TEXT_COLOR = '#ffffff';
+
+// Normalize a text color value — accept #rrggbb / #rgb, default to white.
+export function normalizeTextColor(value) {
+  if (typeof value !== 'string') return DEFAULT_TEXT_COLOR;
+  const v = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(v)) {
+    return ('#' + v.slice(1).split('').map(c => c + c).join('')).toLowerCase();
+  }
+  return DEFAULT_TEXT_COLOR;
+}
+
+export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE_ID, textColor = DEFAULT_TEXT_COLOR) {
   // Place new habit at the end. Cheap to compute client-side because the
   // user can only have a handful of habits (capped at 5 in UI).
   const existing = await loadHabits(userId);
@@ -43,10 +56,13 @@ export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE
   // locks every cell with "habit didn't exist yet."
   const created_at = todayISO();
   const row = { user_id: userId, name, color, sort_order, created_at };
-  // Only send texture if it's been customised — keeps insert compatible with
-  // the old schema (pre-migration 002), where the column doesn't exist.
+  // Only send texture/text_color if customised — keeps insert compatible
+  // with the old schema (pre-migration 002/003), where those columns don't
+  // exist yet.
   const tx = normalizeTexture(texture);
   if (tx !== DEFAULT_TEXTURE_ID) row.texture = tx;
+  const tc = normalizeTextColor(textColor);
+  if (tc !== DEFAULT_TEXT_COLOR) row.text_color = tc;
   const { data, error } = await withTimeout(
     supabase
       .from('habits')

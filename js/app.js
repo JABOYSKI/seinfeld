@@ -1,6 +1,6 @@
 // Main controller — boots, routes auth vs tracker, owns app state.
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
-import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS } from './habits.js';
+import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS, DEFAULT_TEXT_COLOR, normalizeTextColor } from './habits.js';
 import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 import { buildColorWheel } from './colorWheel.js';
 import { loadCompletions, markDay, unmarkDay } from './completions.js';
@@ -390,6 +390,17 @@ function openHabitDialog(existing = null) {
   const used = new Set(state.habits.filter(h => !isEdit || h.id !== existing.id).map(h => h.color));
   const defaultColor = existing?.color || COLORS.find(c => !used.has(c)) || COLORS[0];
   const defaultTexture = normalizeTexture(existing?.texture);
+  const defaultTextColor = normalizeTextColor(existing?.text_color);
+
+  // Live preview: a single tile that shows what a filled cell looks like
+  // with the current color + texture + text-color choices. Updates inline.
+  const PREVIEW_DAY_NUM = 26;
+  const TEXT_PRESETS = [
+    { hex: '#ffffff', label: 'White' },
+    { hex: '#000000', label: 'Black' },
+    { hex: '#bbbbbb', label: 'Light gray' },
+    { hex: '#555555', label: 'Dark gray' },
+  ];
 
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
@@ -403,6 +414,19 @@ function openHabitDialog(existing = null) {
       <div class="form-group">
         <label>Color</label>
         <div class="color-wheel-host" id="dlgWheel"></div>
+      </div>
+      <div class="form-group">
+        <label>Text color</label>
+        <div class="text-color-row">
+          ${TEXT_PRESETS.map(p => `
+            <button type="button" class="text-color-preset ${p.hex === defaultTextColor ? 'is-selected' : ''}"
+                    data-color="${p.hex}" style="background:${p.hex}" title="${p.label}"></button>
+          `).join('')}
+          <input type="text" class="field text-color-hex" id="dlgTextHex" maxlength="7" value="${defaultTextColor}" />
+          <span class="text-color-preview" id="dlgTextPreview">
+            <span class="text-color-preview-num">${PREVIEW_DAY_NUM}</span>
+          </span>
+        </div>
       </div>
       <div class="form-group">
         <label>Texture</label>
@@ -431,17 +455,41 @@ function openHabitDialog(existing = null) {
 
   let chosenColor = defaultColor;
   let chosenTexture = defaultTexture;
+  let chosenTextColor = defaultTextColor;
 
   const nameEl = overlay.querySelector('#dlgName');
   const dlg = overlay.querySelector('.dialog-habit');
-  // Live --habit-color drives every texture swatch in this dialog, so they
-  // update in sync when the color wheel moves.
+  const textHexEl = overlay.querySelector('#dlgTextHex');
+  // Live CSS vars drive every texture swatch + the text-color preview tile,
+  // so they update in real time as the wheel moves or text color changes.
   dlg.style.setProperty('--habit-color', chosenColor);
+  dlg.style.setProperty('--habit-text-color', chosenTextColor);
 
   buildColorWheel(overlay.querySelector('#dlgWheel'), defaultColor, (hex) => {
     chosenColor = hex;
     dlg.style.setProperty('--habit-color', hex);
   });
+
+  // Text-color picker handlers
+  function applyTextColor(hex, syncInput = true) {
+    const normalized = normalizeTextColor(hex);
+    chosenTextColor = normalized;
+    dlg.style.setProperty('--habit-text-color', normalized);
+    if (syncInput) textHexEl.value = normalized;
+    overlay.querySelectorAll('.text-color-preset').forEach(b =>
+      b.classList.toggle('is-selected', b.dataset.color.toLowerCase() === normalized)
+    );
+  }
+  overlay.querySelectorAll('.text-color-preset').forEach(btn => {
+    btn.addEventListener('click', () => applyTextColor(btn.dataset.color));
+  });
+  textHexEl.addEventListener('input', () => {
+    const v = textHexEl.value.trim();
+    if (/^#?[0-9a-fA-F]{6}$/.test(v) || /^#?[0-9a-fA-F]{3}$/.test(v)) {
+      applyTextColor(v.startsWith('#') ? v : '#' + v, /* syncInput= */ false);
+    }
+  });
+  textHexEl.addEventListener('blur', () => { textHexEl.value = chosenTextColor; });
 
   overlay.querySelector('#dlgTextures').addEventListener('click', (e) => {
     const tile = e.target.closest('.texture-tile');
@@ -462,16 +510,16 @@ function openHabitDialog(existing = null) {
     try {
       if (isEdit) {
         const fields = { name, color: chosenColor };
-        // Only send texture if it's been customised — keeps the update
-        // compatible with the old schema (pre-migration 002), where the
-        // column doesn't exist.
+        // Only send texture / text_color if it's been customised — keeps
+        // the update compatible with the old schema (pre-migration 002/003).
         if (chosenTexture !== DEFAULT_TEXTURE_ID || existing.texture) fields.texture = chosenTexture;
+        if (chosenTextColor !== DEFAULT_TEXT_COLOR || existing.text_color) fields.text_color = chosenTextColor;
         const updated = await updateHabit(existing.id, fields);
         Object.assign(existing, updated);
         renderTabs();
         if (existing.id === state.currentHabitId) await loadAndRenderCalendar();
       } else {
-        const created = await createHabit(getUser().id, name, chosenColor, chosenTexture);
+        const created = await createHabit(getUser().id, name, chosenColor, chosenTexture, chosenTextColor);
         state.habits.push(created);
         state.currentHabitId = created.id;
         renderTabs();

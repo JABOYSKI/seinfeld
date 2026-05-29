@@ -21,6 +21,19 @@
 .day-done       { --tx-c: var(--habit-color); }
 .day-slice-done { --tx-c: var(--c); }
 
+/* Day number on a filled cell uses the habit's configurable text color
+   (defaults to white) with a black outline so it stays readable on any
+   background — light habits, dark habits, multi-tone textures. The 4-
+   direction shadow is the standard outline-via-text-shadow trick. */
+.day-done .day-num {
+  color: var(--habit-text-color, #ffffff);
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
+}
+
 /* 1. Matte — flat solid */
 .tx-matte { background: var(--tx-c); }
 

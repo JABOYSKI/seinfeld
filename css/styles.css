@@ -765,7 +765,11 @@ button { font: inherit; color: inherit; }
 .picker-tile.is-selected .picker-label { color: var(--text); }
 
 /* ----- Habit dialog with color wheel + texture grid ----- */
-.dialog-habit { max-width: 460px; }
+.dialog-habit {
+  max-width: 460px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
 
 .color-wheel-host {
   display: flex; flex-direction: column; gap: 10px;
@@ -831,6 +835,51 @@ button { font: inherit; color: inherit; }
   flex: 1;
   font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
   text-transform: uppercase;
+}
+
+/* Text-color picker — 4 presets + hex input + live preview tile that shows
+   the day number with the current habit color, texture choice, and text
+   color all composited together. */
+.text-color-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.text-color-preset {
+  width: 26px; height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform .08s, border-color .12s;
+}
+.text-color-preset:hover  { border-color: var(--text-dim); }
+.text-color-preset:active { transform: scale(.95); }
+.text-color-preset.is-selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.text-color-hex {
+  flex: 1; min-width: 0;
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  text-transform: uppercase;
+}
+.text-color-preview {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--habit-color);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.text-color-preview-num {
+  color: var(--habit-text-color, #ffffff);
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
+  line-height: 1;
 }
 
 /* Texture grid (5 columns, 5 rows) */

@@ -25,6 +25,7 @@ export function renderCalendar(container, habit, completions, year) {
 
   container.innerHTML = html;
   container.style.setProperty('--habit-color', habit.color);
+  container.style.setProperty('--habit-text-color', habit.text_color || '#ffffff');
   container.classList.remove('calendar-all', 'calendar-continuous');
 }
 
@@ -37,6 +38,11 @@ export function renderCalendar(container, habit, completions, year) {
 // Uses grid-auto-flow: column so day cells flow top-to-bottom then
 // left-to-right; leading and trailing blank cells pad the first and last
 // weeks so day 1 of the year lands on the right weekday row.
+
+function applyHabitCSSVars(container, habit) {
+  container.style.setProperty('--habit-color', habit.color);
+  container.style.setProperty('--habit-text-color', habit.text_color || '#ffffff');
+}
 
 export function renderContinuousCalendar(container, habit, completions, year) {
   const today = todayISO();
@@ -98,7 +104,7 @@ export function renderContinuousCalendar(container, habit, completions, year) {
       <div class="strip-grid">${cells}</div>
     </div>
   `;
-  container.style.setProperty('--habit-color', habit.color);
+  applyHabitCSSVars(container, habit);
   container.classList.add('calendar-continuous');
   container.classList.remove('calendar-all');
 }
