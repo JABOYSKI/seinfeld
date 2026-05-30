@@ -5,6 +5,7 @@
 import {
   SCALES, getSelectedSoundId, setSelectedSoundId, playSimulation,
   getOctaveShift, setOctaveShift, OCTAVE_RANGE,
+  getPitchShift, setPitchShift, PITCH_RANGE,
 } from './audio.js';
 
 export function openSoundPicker(onSelected) {
@@ -29,7 +30,12 @@ export function openSoundPicker(onSelected) {
         <label class="sim-label" for="simOctave">Octave shift</label>
         <div class="sim-row">
           <input type="range" id="simOctave" min="${OCTAVE_RANGE.min}" max="${OCTAVE_RANGE.max}" step="1" value="${getOctaveShift()}" />
-          <span class="sim-value" id="simOctaveValue">${formatOctave(getOctaveShift())}</span>
+          <span class="sim-value" id="simOctaveValue">${formatSigned(getOctaveShift())}</span>
+        </div>
+        <label class="sim-label" for="simPitch">Pitch (semitones)</label>
+        <div class="sim-row">
+          <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
+          <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
         </div>
         <p class="sim-hint">Click any tile to hear it at these settings.</p>
       </div>
@@ -59,12 +65,19 @@ export function openSoundPicker(onSelected) {
   const simPlay = overlay.querySelector('#simPlay');
   const simOctave = overlay.querySelector('#simOctave');
   const simOctaveValue = overlay.querySelector('#simOctaveValue');
+  const simPitch = overlay.querySelector('#simPitch');
+  const simPitchValue = overlay.querySelector('#simPitchValue');
 
   simLength.addEventListener('input', () => { simValue.textContent = simLength.value; });
 
   simOctave.addEventListener('input', () => {
     const v = setOctaveShift(parseInt(simOctave.value, 10));
-    simOctaveValue.textContent = formatOctave(v);
+    simOctaveValue.textContent = formatSigned(v);
+  });
+
+  simPitch.addEventListener('input', () => {
+    const v = setPitchShift(parseInt(simPitch.value, 10));
+    simPitchValue.textContent = formatSigned(v);
   });
 
   simPlay.addEventListener('click', () => {
@@ -92,7 +105,7 @@ export function openSoundPicker(onSelected) {
   document.addEventListener('keydown', onKey);
 }
 
-function formatOctave(v) {
+function formatSigned(v) {
   if (v === 0) return '0';
   return v > 0 ? `+${v}` : `${v}`;
 }

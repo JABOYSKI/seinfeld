@@ -123,9 +123,12 @@ export const SCALES = [
 export const DEFAULT_SOUND_ID = 'off';
 const STORAGE_KEY = 'seinfeld_sound_scale';
 const OCTAVE_STORAGE_KEY = 'seinfeld_sound_octave';
+const PITCH_STORAGE_KEY = 'seinfeld_sound_pitch';
 const VALID_IDS = new Set(SCALES.map(s => s.id));
-const MIN_OCTAVE = -2;
-const MAX_OCTAVE = 2;
+const MIN_OCTAVE = -4;   // wider downward range so low scales can rumble
+const MAX_OCTAVE = 3;
+const MIN_PITCH = -12;   // semitones — full octave each way for fine tuning
+const MAX_PITCH = 12;
 
 export function getSelectedSoundId() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -136,9 +139,7 @@ export function setSelectedSoundId(id) {
   localStorage.setItem(STORAGE_KEY, id);
   return true;
 }
-// Octave shift (-2..+2) — multiplies every note frequency by 2^shift. Applied
-// inside freqAt so it affects playNoteAt, playChord, playBurst, and the
-// picker's simulator equally.
+// Octave shift (integer) — multiplies every note frequency by 2^shift.
 export function getOctaveShift() {
   const v = parseInt(localStorage.getItem(OCTAVE_STORAGE_KEY), 10);
   if (Number.isNaN(v) || v < MIN_OCTAVE || v > MAX_OCTAVE) return 0;
@@ -149,7 +150,20 @@ export function setOctaveShift(n) {
   localStorage.setItem(OCTAVE_STORAGE_KEY, String(v));
   return v;
 }
+// Pitch shift (semitones, integer) — finer than octave shift. Stacks with
+// octave shift, so e.g. octave=+1 + pitch=+5 = +17 semitones total.
+export function getPitchShift() {
+  const v = parseInt(localStorage.getItem(PITCH_STORAGE_KEY), 10);
+  if (Number.isNaN(v) || v < MIN_PITCH || v > MAX_PITCH) return 0;
+  return v;
+}
+export function setPitchShift(n) {
+  const v = Math.max(MIN_PITCH, Math.min(MAX_PITCH, Math.round(n)));
+  localStorage.setItem(PITCH_STORAGE_KEY, String(v));
+  return v;
+}
 export const OCTAVE_RANGE = { min: MIN_OCTAVE, max: MAX_OCTAVE };
+export const PITCH_RANGE  = { min: MIN_PITCH,  max: MAX_PITCH };
 export function getCurrentScale() {
   return SCALES.find(s => s.id === getSelectedSoundId());
 }
@@ -224,14 +238,30 @@ function playMalletNote(freq, opts = {}) {
 // To keep notes distinct beyond the scale's length, we octave-shift: every
 // notes.length steps wraps back to the first note but doubled in frequency.
 // Capped at 3 octaves up so the top of a long chain doesn't go ultrasonic.
-const MAX_OCTAVE_SHIFT = 3;
+// How far the chain's auto octave-wrap can climb before repeating —
+// computed per-scale so the top of a long cascade stays under ~16 kHz
+// (above that it's ultrasonic for most adults). A low scale like Marimba
+// Low gets ~5 octaves of distinct cells before wrap; Music Box only ~2
+// because it already sits near the top of the audible range. Replaces the
+// old hardcoded 3-octave cap that made long chains repeat noticeably.
+const AUDIBLE_CEILING_HZ = 16000;
+const _maxWrapCache = new WeakMap();
+function maxOctaveWrapForScale(scale) {
+  if (_maxWrapCache.has(scale)) return _maxWrapCache.get(scale);
+  const highest = Math.max.apply(null, scale.notes);
+  const max = Math.max(1, Math.floor(Math.log2(AUDIBLE_CEILING_HZ / highest)));
+  _maxWrapCache.set(scale, max);
+  return max;
+}
 function freqAt(scale, index) {
   const notes = scale.notes;
   const i = Math.max(0, index);
-  const octave = Math.min(Math.floor(i / notes.length), MAX_OCTAVE_SHIFT);
+  const octaveWrap = Math.min(Math.floor(i / notes.length), maxOctaveWrapForScale(scale));
   const noteInOctave = i % notes.length;
-  // User-selected octave shift on top of the auto octave-wrap for long chains.
-  return notes[noteInOctave] * Math.pow(2, octave + getOctaveShift());
+  // Combined shift: chain auto-wrap + user's octave slider + pitch slider
+  // (semitones converted to a fractional octave).
+  const totalOctaves = octaveWrap + getOctaveShift() + getPitchShift() / 12;
+  return notes[noteInOctave] * Math.pow(2, totalOctaves);
 }
 export function playNoteAt(index, opts = {}) {
   const scale = getCurrentScale();
