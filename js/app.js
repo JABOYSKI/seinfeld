@@ -12,6 +12,8 @@ import { toast, todayISO, canEditDay } from './utils.js';
 import { getSelectedAnimationId, FILL_ANIMATION_DURATION_MS } from './fillAnimations.js';
 import { openAnimationPicker } from './animationPicker.js';
 import { openChainPicker } from './chainPicker.js';
+import { openSoundPicker } from './soundPicker.js';
+import { getSelectedSoundId } from './audio.js';
 import { playChainAnimation } from './chainBuild.js';
 
 const MAX_HABITS = 5;
@@ -160,6 +162,7 @@ function renderShell() {
         <div class="header-spacer"></div>
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
+        <button class="icon-btn ${getSelectedSoundId() !== 'off' ? 'is-active' : ''}" id="soundBtn" title="Choose chain sound">${getSelectedSoundId() === 'off' ? '🔇' : '🔊'}</button>
         <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${viewToggleIcon()}</button>
         <button class="icon-btn ${getShowWeekNumbers() ? 'is-active' : ''}" id="weekNumBtn" title="Toggle week numbers (continuous view)">#</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
@@ -209,6 +212,14 @@ function renderShell() {
   });
   document.getElementById('chainAnimBtn').addEventListener('click', () => {
     openChainPicker((id) => toast(`Chain: ${id}`, 'info'));
+  });
+  const soundBtn = document.getElementById('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    openSoundPicker((id) => {
+      soundBtn.textContent = id === 'off' ? '🔇' : '🔊';
+      soundBtn.classList.toggle('is-active', id !== 'off');
+      toast(`Sound: ${id}`, 'info');
+    });
   });
   els.signoutBtn.addEventListener('click', async () => {
     await signOut();
