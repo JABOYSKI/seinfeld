@@ -111,13 +111,21 @@ function playMalletNote(freq, opts = {}) {
 // Play a single ascending note at the given step index. Used by chain
 // animations to fire one note per cell, called inside the same setTimeout
 // that pulses the cell — perfect visual/audio sync.
+//
+// To keep notes distinct beyond the scale's length, we octave-shift: every
+// notes.length steps wraps back to the first note but doubled in frequency.
+// Capped at 3 octaves up so the top of a long chain doesn't go ultrasonic.
+const MAX_OCTAVE_SHIFT = 3;
 export function playNoteAt(index, opts = {}) {
   const scale = getCurrentScale();
   if (!scale || !scale.notes) return;
   const notes = scale.notes;
-  const idx = Math.min(Math.max(0, index), notes.length - 1);
-  const { gain = 0.42 + Math.min(idx, 8) * 0.018, duration = 0.7 } = opts;
-  playMalletNote(notes[idx], { gain, duration });
+  const i = Math.max(0, index);
+  const octave = Math.min(Math.floor(i / notes.length), MAX_OCTAVE_SHIFT);
+  const noteInOctave = i % notes.length;
+  const freq = notes[noteInOctave] * Math.pow(2, octave);
+  const { gain = 0.4 + Math.min(i, 20) * 0.008, duration = 0.7 } = opts;
+  playMalletNote(freq, { gain, duration });
 }
 
 // All cells pulse simultaneously — play a brief stacked-note chord.

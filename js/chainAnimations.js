@@ -131,15 +131,12 @@ function collectChainCellsFromAnchor(calendarEl, anchorDayISO, streakLength, com
   return cells;
 }
 
-// Cascade length = number of PAST cells included. At streak 2, this is 1
-// (yesterday). Sequential animations need at least one past cell to show
-// direction; without this, streak 2 has no cells to operate on.
+// Cascade length = number of PAST cells included = streak - 1 (so the
+// whole connected chain back to its oldest day lights up + plays a note).
+// No cap: a 30-day chain plays 30 notes, a 100-day chain plays 100 notes.
+// playNoteAt octave-shifts so every cell gets a distinct pitch.
 function cascadeLengthForStreak(streak) {
-  if (streak < 2)  return 0;
-  if (streak < 7)  return Math.min(streak - 1, 3);
-  if (streak < 14) return Math.min(streak - 1, 6);
-  if (streak < 30) return Math.min(streak - 1, 10);
-  return Math.min(streak - 1, 14);
+  return streak < 2 ? 0 : streak - 1;
 }
 
 function floaterSize(streak) {
