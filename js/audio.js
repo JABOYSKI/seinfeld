@@ -48,6 +48,26 @@ export const SCALES = [
   { id: 'music-box',   name: 'Music Box',          blurb: 'Tiny, twinkly',      notes: [880, 988, 1175, 1319, 1480, 1760, 1976, 2349, 2637, 2960] },
   { id: 'marimba-low', name: 'Marimba Low',        blurb: 'Warm, woody',        notes: [131, 147, 165, 196, 220, 262, 294, 330, 392, 440] },
   { id: 'gamelan',     name: 'Gamelan',            blurb: 'Indonesian metal',   notes: [262, 311, 349, 415, 466, 523, 622, 698, 831, 932] },
+
+  // ----- 15 more, added later -----
+  // Western modes
+  { id: 'dorian',         name: 'Dorian',           blurb: 'Jazzy minor mode',   notes: [262, 294, 311, 349, 392, 440, 466, 523, 587, 622] },
+  { id: 'phrygian-dom',   name: 'Phrygian Dominant',blurb: 'Arabic / Klezmer',   notes: [262, 277, 330, 349, 392, 415, 466, 523, 554, 659] },
+  { id: 'harmonic-minor', name: 'Harmonic Minor',   blurb: 'Dramatic, brooding', notes: [262, 294, 311, 349, 392, 415, 494, 523, 587, 622] },
+  { id: 'blues',          name: 'Blues',            blurb: 'Bluesy with flat-5', notes: [262, 311, 349, 370, 392, 466, 523, 622, 698, 740] },
+  { id: 'major-hepta',    name: 'Major Heptatonic', blurb: 'Full bright scale',  notes: [262, 294, 330, 349, 392, 440, 494, 523, 587, 659] },
+  // Eastern flavors
+  { id: 'in-sen',         name: 'In Sen',           blurb: 'Japanese, somber',   notes: [262, 277, 349, 392, 466, 523, 554, 698, 784, 932] },
+  { id: 'iwato',          name: 'Iwato',            blurb: 'Japanese, dark',     notes: [262, 277, 349, 370, 466, 523, 554, 698, 740, 932] },
+  { id: 'hang-drum',      name: 'Hang Drum',        blurb: 'D Hijaz meditative', notes: [294, 349, 392, 440, 523, 587, 698, 784, 880, 1047] },
+  // Instrument-flavored register/interval combos
+  { id: 'kalimba',        name: 'Kalimba',          blurb: 'Warm thumb piano',   notes: [196, 220, 247, 294, 330, 392, 440, 494, 587, 659] },
+  { id: 'celesta',        name: 'Celesta',          blurb: 'Glass crystalline',  notes: [659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349] },
+  { id: 'steel-drum',     name: 'Steel Drum',       blurb: 'Caribbean bright',   notes: [349, 392, 440, 466, 523, 587, 659, 698, 784, 880] },
+  { id: 'bell-tower',     name: 'Bell Tower',       blurb: 'Low resonant bells', notes: [ 65,  98, 131, 165, 196, 247, 294, 392, 523, 659] },
+  { id: 'cathedral',      name: 'Cathedral',        blurb: 'Deep church bells',  notes: [ 65,  98, 131, 196, 262, 392, 523, 784, 1047, 1568] },
+  { id: 'spirit-forest',  name: 'Spirit Forest',    blurb: 'Sparse high bells',  notes: [523, 784, 1047, 1175, 1568, 1760, 2093, 2637, 3136, 3520] },
+  { id: 'sci-fi',         name: 'Sci-Fi',           blurb: 'Quartal suspended',  notes: [262, 349, 392, 523, 587, 698, 784, 880, 1047, 1175] },
 ];
 
 export const DEFAULT_SOUND_ID = 'off';

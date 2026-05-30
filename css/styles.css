@@ -738,14 +738,15 @@ button { font: inherit; color: inherit; }
   font-weight: 800;
 }
 
-/* Sound picker: vertical tile list with name + blurb. Wider tiles than the
-   fill/chain pickers because each shows a description, not just a name. */
-.dialog-sound-picker { max-width: 520px; }
+/* Sound picker: compact tiles in a 3-col grid (2 on narrow screens). Now
+   that there are 25+ scales, the grid scrolls; tooltips carry the blurb. */
+.dialog-sound-picker { max-width: 640px; }
 .picker-grid-sound {
-  grid-template-columns: 1fr 1fr;
-  max-height: 60vh;
+  grid-template-columns: repeat(3, 1fr);
+  max-height: 62vh;
 }
-@media (max-width: 480px) { .picker-grid-sound { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .picker-grid-sound { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 380px) { .picker-grid-sound { grid-template-columns: 1fr; } }
 .sound-tile {
   flex-direction: row;
   align-items: center;
