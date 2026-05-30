@@ -8,15 +8,26 @@
 
 import { playChainAnimation as playSelectedChain } from './chainAnimations.js';
 
+// Most fill animations peak around 150-250ms in and settle by 500-700ms.
+// We wait this long after the click before kicking the chain animation in
+// so the two don't transform the same anchor cell simultaneously. Result:
+// fill provides the click feedback, then the chain takes the visual baton
+// without overlap on the focal cell.
+const CHAIN_AFTER_FILL_MS = 350;
+// Milestone toast lands after the chain has mostly finished so it reads
+// like a celebration following the chain rather than competing with it.
+const MILESTONE_TOAST_MS = 1200;
+
 // anchorDayISO = the cell the user just filled. Animation emanates from there
 // (which usually but not always === today). completionsSet lets the cascade
 // trace only the connected filled segment behind the anchor.
 export function playChainAnimation(calendarEl, streakLength, habit, anchorDayISO, completionsSet) {
   if (streakLength < 2) return;
-  playSelectedChain(calendarEl, streakLength, habit, anchorDayISO, completionsSet);
+  setTimeout(() => {
+    playSelectedChain(calendarEl, streakLength, habit, anchorDayISO, completionsSet);
+  }, CHAIN_AFTER_FILL_MS);
   if (isMilestone(streakLength)) {
-    // Slight delay so the toast doesn't compete with the per-cell effect.
-    setTimeout(() => showMilestoneToast(streakLength, habit.color, habit.name), 600);
+    setTimeout(() => showMilestoneToast(streakLength, habit.color, habit.name), MILESTONE_TOAST_MS);
   }
 }
 
