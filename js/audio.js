@@ -68,6 +68,56 @@ export const SCALES = [
   { id: 'cathedral',      name: 'Cathedral',        blurb: 'Deep church bells',  notes: [ 65,  98, 131, 196, 262, 392, 523, 784, 1047, 1568] },
   { id: 'spirit-forest',  name: 'Spirit Forest',    blurb: 'Sparse high bells',  notes: [523, 784, 1047, 1175, 1568, 1760, 2093, 2637, 3136, 3520] },
   { id: 'sci-fi',         name: 'Sci-Fi',           blurb: 'Quartal suspended',  notes: [262, 349, 392, 523, 587, 698, 784, 880, 1047, 1175] },
+
+  // ----- 15 themed scales (synth params dialed in per theme) -----
+  // Each one sets a `synth` block that overrides the default mallet timbre.
+  // Variety here comes from BOTH the notes (intervals/register) AND the
+  // timbre (oscillator type / envelope / harmonic / filter).
+  { id: 'underwater',     name: 'Underwater',       blurb: 'Muffled deep tones',
+    notes: [131, 147, 165, 196, 220, 262, 294, 330, 392, 440],
+    synth: { type: 'sine', duration: 1.4, attack: 0.04, harmonic: 2, harmonicGain: 0.45, filter: 600 } },
+  { id: 'crystal-cave',   name: 'Crystal Cave',     blurb: 'Icy sparkle',
+    notes: [330, 392, 440, 523, 587, 659, 784, 880, 1047, 1175],
+    synth: { type: 'triangle', duration: 0.5, attack: 0.001, harmonic: 4, harmonicGain: 0.32 } },
+  { id: 'tibetan-bowls',  name: 'Tibetan Bowls',    blurb: 'Singing bowls',
+    notes: [196, 262, 311, 349, 392, 440, 523, 587, 659, 784],
+    synth: { type: 'sine', duration: 2.6, attack: 0.1, harmonic: 3, harmonicGain: 0.5, harmonicDecay: 0.6, detune: 4 } },
+  { id: 'carnival',       name: 'Carnival',         blurb: 'Playful, bouncy',
+    notes: [262, 330, 392, 440, 523, 659, 784, 880, 1047, 1319],
+    synth: { type: 'triangle', duration: 0.35, attack: 0.005, harmonic: 2, harmonicGain: 0.25, filter: 4000 } },
+  { id: 'haunted',        name: 'Haunted House',    blurb: 'Eerie chromatic',
+    notes: [220, 247, 277, 311, 330, 370, 415, 440, 494, 554],
+    synth: { type: 'sawtooth', duration: 1.5, attack: 0.02, harmonic: 1.5, harmonicGain: 0.3, filter: 700 } },
+  { id: 'aurora',         name: 'Aurora Borealis',  blurb: 'Shimmery, slow',
+    notes: [392, 440, 494, 523, 587, 659, 740, 784, 880, 988],
+    synth: { type: 'sine', duration: 2.0, attack: 0.15, harmonic: 4, harmonicGain: 0.4, detune: 10 } },
+  { id: 'dark-music-box', name: 'Music Box (Dark)', blurb: 'Minor key, creepy',
+    notes: [880, 932, 1047, 1109, 1175, 1319, 1397, 1480, 1568, 1760],
+    synth: { type: 'triangle', duration: 0.55, attack: 0.002, harmonic: 4, harmonicGain: 0.2 } },
+  { id: 'coral-reef',     name: 'Coral Reef',       blurb: 'Bright tropical',
+    notes: [440, 494, 587, 659, 784, 880, 988, 1047, 1175, 1319],
+    synth: { type: 'triangle', duration: 0.5, attack: 0.003, harmonic: 4, harmonicGain: 0.28 } },
+  { id: 'wind-pines',     name: 'Wind Through Pines', blurb: 'Sparse + airy',
+    notes: [196, 220, 262, 294, 330, 392, 440, 494, 587, 659],
+    synth: { type: 'sine', duration: 1.3, attack: 0.05, harmonic: 3, harmonicGain: 0.4, filter: 1500 } },
+  { id: 'steam-punk',     name: 'Steam Punk',       blurb: 'Mechanical brass',
+    notes: [196, 220, 247, 294, 330, 392, 440, 494, 587, 659],
+    synth: { type: 'sawtooth', duration: 0.45, attack: 0.005, harmonic: 2, harmonicGain: 0.4, filter: 1800 } },
+  { id: 'spaceship',      name: 'Spaceship Console',blurb: 'Tech blips',
+    notes: [440, 494, 523, 587, 659, 698, 784, 880, 988, 1047],
+    synth: { type: 'square', duration: 0.18, attack: 0.001, harmonic: 8, harmonicGain: 0.12, filter: 3000 } },
+  { id: 'cosmic-drift',   name: 'Cosmic Drift',     blurb: 'Long open pads',
+    notes: [98, 147, 196, 262, 392, 523, 784, 1047, 1568, 2093],
+    synth: { type: 'sine', duration: 3.2, attack: 0.2, harmonic: 2, harmonicGain: 0.3 } },
+  { id: 'pixie-dust',     name: 'Pixie Dust',       blurb: 'Tiny fairy bells',
+    notes: [1568, 1760, 2093, 2349, 2637, 2960, 3136, 3520, 3951, 4186],
+    synth: { type: 'sine', duration: 0.3, attack: 0.001, harmonic: 4, harmonicGain: 0.15 } },
+  { id: 'thunderclap',    name: 'Thunderclap',      blurb: 'Low rumble',
+    notes: [49, 65, 82, 98, 110, 131, 165, 196, 247, 262],
+    synth: { type: 'triangle', duration: 1.6, attack: 0.005, harmonic: 2, harmonicGain: 0.35, filter: 400 } },
+  { id: 'sunrise',        name: 'Sunrise',          blurb: 'Warm ascending',
+    notes: [262, 330, 392, 440, 523, 587, 659, 784, 880, 1047],
+    synth: { type: 'triangle', duration: 1.0, attack: 0.03, harmonic: 4, harmonicGain: 0.3 } },
 ];
 
 export const DEFAULT_SOUND_ID = 'off';
@@ -91,41 +141,63 @@ export function isSoundEnabled() {
   return !!(s && s.notes);
 }
 
-// One mallet hit. The fast attack + exponential decay is what makes it sound
-// like a bar being struck rather than a sustained organ note. A second
-// oscillator two octaves up adds the bright transient that distinguishes
-// mallets from a pure sine.
+// One mallet hit. Default is a sine fundamental + soft sine harmonic two
+// octaves up — that's a classic xylophone/marimba ping. Themed scales pass
+// `synth: {...}` to dial it in to a different timbre: longer decay for
+// bells, sawtooth for steampunk, square for spaceship beeps, lowpass
+// filter for "underwater" muffling, slow attack for shimmery pads, etc.
 function playMalletNote(freq, opts = {}) {
   const c = ensureCtx();
   if (!c) return;
-  const { duration = 0.6, gain = 0.5, when = 0 } = opts;
+  const {
+    duration = 0.6,
+    gain = 0.5,
+    when = 0,
+    type = 'sine',
+    attack = 0.004,
+    harmonic = 4,           // multiplier on freq for the partial
+    harmonicGain = 0.18,    // partial loudness relative to fundamental
+    harmonicDecay = 0.35,   // partial decay relative to fundamental duration
+    detune = 0,             // cents — slight detune gives shimmer/ensemble
+    filter = null,          // lowpass cutoff Hz, null = no filter
+  } = opts;
   const t = c.currentTime + when;
 
+  // Build a per-note signal chain. Filter goes between the env and master
+  // when requested; otherwise we go straight to master.
+  const sink = filter ? (() => {
+    const f = c.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = filter;
+    f.connect(masterGain);
+    return f;
+  })() : masterGain;
+
   const osc1 = c.createOscillator();
-  osc1.type = 'sine';
+  osc1.type = type;
   osc1.frequency.value = freq;
-
-  const osc2 = c.createOscillator();
-  osc2.type = 'sine';
-  osc2.frequency.value = freq * 4;  // 2nd-octave harmonic
-
+  if (detune) osc1.detune.value = detune;
   const env1 = c.createGain();
   env1.gain.setValueAtTime(0.0001, t);
-  env1.gain.exponentialRampToValueAtTime(gain, t + 0.004);
+  env1.gain.exponentialRampToValueAtTime(gain, t + attack);
   env1.gain.exponentialRampToValueAtTime(0.0001, t + duration);
-
-  const env2 = c.createGain();
-  env2.gain.setValueAtTime(0.0001, t);
-  env2.gain.exponentialRampToValueAtTime(gain * 0.18, t + 0.004);
-  env2.gain.exponentialRampToValueAtTime(0.0001, t + duration * 0.35);
-
-  osc1.connect(env1).connect(masterGain);
-  osc2.connect(env2).connect(masterGain);
-
+  osc1.connect(env1).connect(sink);
   osc1.start(t);
   osc1.stop(t + duration + 0.05);
-  osc2.start(t);
-  osc2.stop(t + duration * 0.4 + 0.05);
+
+  if (harmonicGain > 0 && harmonic > 0) {
+    const osc2 = c.createOscillator();
+    osc2.type = type;
+    osc2.frequency.value = freq * harmonic;
+    if (detune) osc2.detune.value = -detune;
+    const env2 = c.createGain();
+    env2.gain.setValueAtTime(0.0001, t);
+    env2.gain.exponentialRampToValueAtTime(gain * harmonicGain, t + attack);
+    env2.gain.exponentialRampToValueAtTime(0.0001, t + duration * harmonicDecay);
+    osc2.connect(env2).connect(sink);
+    osc2.start(t);
+    osc2.stop(t + duration * harmonicDecay + 0.05);
+  }
 }
 
 // Play a single ascending note at the given step index. Used by chain
@@ -136,25 +208,30 @@ function playMalletNote(freq, opts = {}) {
 // notes.length steps wraps back to the first note but doubled in frequency.
 // Capped at 3 octaves up so the top of a long chain doesn't go ultrasonic.
 const MAX_OCTAVE_SHIFT = 3;
-export function playNoteAt(index, opts = {}) {
-  const scale = getCurrentScale();
-  if (!scale || !scale.notes) return;
+function freqAt(scale, index) {
   const notes = scale.notes;
   const i = Math.max(0, index);
   const octave = Math.min(Math.floor(i / notes.length), MAX_OCTAVE_SHIFT);
   const noteInOctave = i % notes.length;
-  const freq = notes[noteInOctave] * Math.pow(2, octave);
-  const { gain = 0.4 + Math.min(i, 20) * 0.008, duration = 0.7 } = opts;
-  playMalletNote(freq, { gain, duration });
+  return notes[noteInOctave] * Math.pow(2, octave);
+}
+export function playNoteAt(index, opts = {}) {
+  const scale = getCurrentScale();
+  if (!scale || !scale.notes) return;
+  const i = Math.max(0, index);
+  const synth = scale.synth || {};
+  const { gain = 0.4 + Math.min(i, 20) * 0.008 } = opts;
+  playMalletNote(freqAt(scale, i), { ...synth, gain });
 }
 
 // All cells pulse simultaneously — play a brief stacked-note chord.
 export function playChord(count) {
   const scale = getCurrentScale();
   if (!scale || !scale.notes) return;
+  const synth = scale.synth || {};
   const n = Math.min(count, scale.notes.length);
   for (let i = 0; i < n; i++) {
-    playMalletNote(scale.notes[i], { gain: 0.42 / Math.sqrt(n), duration: 0.75 });
+    playMalletNote(scale.notes[i], { ...synth, gain: 0.42 / Math.sqrt(n) });
   }
 }
 
@@ -162,23 +239,34 @@ export function playChord(count) {
 export function playBurst() {
   const scale = getCurrentScale();
   if (!scale || !scale.notes) return;
-  // Mid-high of the scale, louder than a normal step
+  const synth = scale.synth || {};
   const note = scale.notes[Math.min(5, scale.notes.length - 1)];
-  playMalletNote(note, { gain: 0.65, duration: 0.85 });
+  playMalletNote(note, { ...synth, gain: 0.65 });
 }
 
-// Quick ascending arpeggio for picker previews.
-export function playPreview(scaleId) {
+// Simulator-style preview: play a full chain of `length` notes using the
+// given scale at the same per-step timing the chain animation would use.
+// Lets the sound-picker simulator show what a streak of N actually sounds
+// like with each scale.
+export function playSimulation(scaleId, length) {
   const scale = SCALES.find(s => s.id === scaleId);
   if (!scale || !scale.notes) return;
   const c = ensureCtx();
   if (!c) return;
-  const steps = Math.min(5, scale.notes.length);
-  for (let i = 0; i < steps; i++) {
-    playMalletNote(scale.notes[i], {
-      when: i * 0.08,
-      gain: 0.45,
-      duration: 0.5,
+  const n = Math.max(1, Math.min(length, 200));
+  // Mirror adaptiveStep from chainAnimations.js so the preview's timing
+  // matches the real cascade.
+  const stepMs = n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n));
+  const synth = scale.synth || {};
+  const startSec = c.currentTime;
+  for (let i = 0; i < n; i++) {
+    const gain = 0.4 + Math.min(i, 20) * 0.008;
+    // Schedule via Web Audio's `when` for sample-accurate pacing in the
+    // preview (no DOM cells to keep in sync with).
+    playMalletNote(freqAt(scale, i), {
+      ...synth,
+      gain,
+      when: (startSec - c.currentTime) + (i * stepMs) / 1000,
     });
   }
 }

@@ -1,8 +1,10 @@
-// Picker modal for chain-build sounds. Click a tile to select + hear an
-// ascending arpeggio preview. AudioContext is created lazily on click —
-// hover would be cleaner UX but most browsers don't count hover as a user
-// gesture, so audio wouldn't initialize.
-import { SCALES, getSelectedSoundId, setSelectedSoundId, playPreview } from './audio.js';
+// Picker modal for chain-build sounds. Now includes a simulator at the top:
+// drag the slider to a chain length, then click any tile to hear what that
+// scale would sound like at that length (the timing matches the real
+// cascade's adaptiveStep).
+import {
+  SCALES, getSelectedSoundId, setSelectedSoundId, playSimulation,
+} from './audio.js';
 
 export function openSoundPicker(onSelected) {
   const currentId = getSelectedSoundId();
@@ -13,8 +15,19 @@ export function openSoundPicker(onSelected) {
     <div class="dialog dialog-picker dialog-sound-picker" role="dialog" aria-modal="true" aria-label="Choose chain sound">
       <div class="picker-header">
         <h2>Chain sound</h2>
-        <p class="picker-sub">Mallet hits play as your chain lights up. Click a scale to hear it.</p>
+        <p class="picker-sub">Mallet hits play as your chain lights up.</p>
       </div>
+
+      <div class="sound-simulator">
+        <label class="sim-label" for="simLength">Simulate chain length</label>
+        <div class="sim-row">
+          <input type="range" id="simLength" min="2" max="60" value="8" />
+          <span class="sim-value" id="simLengthValue">8</span>
+          <button type="button" class="btn btn-primary sim-play" id="simPlay">Play</button>
+        </div>
+        <p class="sim-hint">Click any tile to hear it at this length.</p>
+      </div>
+
       <div class="picker-grid picker-grid-sound" id="soundPickerGrid">
         ${SCALES.map(s => `
           <button type="button"
@@ -23,7 +36,6 @@ export function openSoundPicker(onSelected) {
                   title="${s.blurb}">
             <span class="sound-tile-icon">${s.id === 'off' ? '🔇' : '🎵'}</span>
             <span class="picker-label">${s.name}</span>
-            <span class="sound-tile-blurb">${s.blurb}</span>
           </button>
         `).join('')}
       </div>
@@ -36,13 +48,23 @@ export function openSoundPicker(onSelected) {
   document.body.appendChild(overlay);
 
   const grid = overlay.querySelector('#soundPickerGrid');
+  const simLength = overlay.querySelector('#simLength');
+  const simValue = overlay.querySelector('#simLengthValue');
+  const simPlay = overlay.querySelector('#simPlay');
+
+  simLength.addEventListener('input', () => { simValue.textContent = simLength.value; });
+
+  simPlay.addEventListener('click', () => {
+    playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
+  });
+
   grid.querySelectorAll('.sound-tile').forEach(tile => {
     tile.addEventListener('click', () => {
       const id = tile.dataset.sound;
       setSelectedSoundId(id);
       grid.querySelectorAll('.sound-tile').forEach(t => t.classList.toggle('is-selected', t === tile));
-      // Click is a user gesture — safe to fire the synth.
-      playPreview(id);
+      // Preview at the simulator length so the user can A/B scales quickly.
+      playSimulation(id, parseInt(simLength.value, 10));
       if (onSelected) onSelected(id);
     });
   });

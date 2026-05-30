@@ -738,15 +738,52 @@ button { font: inherit; color: inherit; }
   font-weight: 800;
 }
 
-/* Sound picker: compact tiles in a 3-col grid (2 on narrow screens). Now
-   that there are 25+ scales, the grid scrolls; tooltips carry the blurb. */
+/* Sound picker: compact tiles in a 3-col grid (2 on narrow screens). With
+   40+ scales the grid scrolls; tooltips carry the blurb. */
 .dialog-sound-picker { max-width: 640px; }
 .picker-grid-sound {
   grid-template-columns: repeat(3, 1fr);
-  max-height: 62vh;
+  max-height: 50vh;
 }
 @media (max-width: 560px) { .picker-grid-sound { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 380px) { .picker-grid-sound { grid-template-columns: 1fr; } }
+
+/* Chain-length simulator at the top of the sound picker. Slider sets the
+   N used by both the standalone "Play" button and the per-tile click
+   previews, so the user can A/B scales at a specific streak length. */
+.sound-simulator {
+  background: var(--bg-elev);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.sim-label {
+  display: block;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+.sim-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.sim-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.sim-value {
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  font-size: 13px; font-weight: 700;
+  color: var(--text);
+  min-width: 28px; text-align: right;
+}
+.sim-play { padding: 6px 14px; font-size: 12px; }
+.sim-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: var(--text-faint);
+}
 .sound-tile {
   flex-direction: row;
   align-items: center;
