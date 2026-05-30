@@ -852,6 +852,9 @@ button { font: inherit; color: inherit; }
   flex-direction: column;
   gap: 2px;
 }
+/* `display: flex` above otherwise wins over the user-agent `[hidden]` rule
+   and the panel becomes impossible to close. */
+.pattern-picker-panel[hidden] { display: none; }
 .pattern-option {
   width: 100%;
   display: flex;
