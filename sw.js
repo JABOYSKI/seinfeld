@@ -1,7 +1,7 @@
 // Service worker — app shell cache only.
 // Versioned cache name is stamped by deploy.bat on every deploy so browsers
 // pick up new assets without manual cache-clearing.
-const CACHE = 'seinfeld-2026-05-30T09:02:26Z';
+const CACHE = 'seinfeld-2026-05-30T09:05:34Z';
 const SHELL = [
   './',
   './index.html',
@@ -54,10 +54,12 @@ self.addEventListener('fetch', (e) => {
   if (url.host.endsWith('supabase.co')) return;
 
   // Network-first for our own shell so deploys propagate immediately when
-  // online; fall back to cache when offline.
+  // online; fall back to cache when offline. `cache: 'no-cache'` forces the
+  // browser HTTP cache to revalidate (sends If-None-Match), so ES-module
+  // imports without a `?v=` query string can't be served stale.
   if (url.origin === self.location.origin) {
     e.respondWith(
-      fetch(req).then(res => {
+      fetch(req, { cache: 'no-cache' }).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
         return res;
