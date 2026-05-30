@@ -108,24 +108,16 @@ function playMalletNote(freq, opts = {}) {
   osc2.stop(t + duration * 0.4 + 0.05);
 }
 
-// Pre-schedules a sequence of `count` ascending notes at `stepMs` intervals.
-// Sample-accurate timing via Web Audio's start() — better than driving each
-// note through setTimeout.
-export function playSequence(count, stepMs, opts = {}) {
+// Play a single ascending note at the given step index. Used by chain
+// animations to fire one note per cell, called inside the same setTimeout
+// that pulses the cell — perfect visual/audio sync.
+export function playNoteAt(index, opts = {}) {
   const scale = getCurrentScale();
-  if (!scale || !scale.notes || count <= 0) return;
+  if (!scale || !scale.notes) return;
   const notes = scale.notes;
-  const { reverse = false } = opts;
-  for (let i = 0; i < count; i++) {
-    const idx = Math.min(reverse ? count - 1 - i : i, notes.length - 1);
-    const note = notes[idx];
-    // Slight per-step gain bump so later notes feel like they're arriving with weight
-    playMalletNote(note, {
-      when: i * stepMs / 1000,
-      gain: 0.42 + Math.min(i, 8) * 0.018,
-      duration: 0.7,
-    });
-  }
+  const idx = Math.min(Math.max(0, index), notes.length - 1);
+  const { gain = 0.42 + Math.min(idx, 8) * 0.018, duration = 0.7 } = opts;
+  playMalletNote(notes[idx], { gain, duration });
 }
 
 // All cells pulse simultaneously — play a brief stacked-note chord.
@@ -134,7 +126,6 @@ export function playChord(count) {
   if (!scale || !scale.notes) return;
   const n = Math.min(count, scale.notes.length);
   for (let i = 0; i < n; i++) {
-    // Skip a couple to make wider intervals when count is small
     playMalletNote(scale.notes[i], { gain: 0.42 / Math.sqrt(n), duration: 0.75 });
   }
 }
@@ -143,7 +134,7 @@ export function playChord(count) {
 export function playBurst() {
   const scale = getCurrentScale();
   if (!scale || !scale.notes) return;
-  // Top of the scale, louder
+  // Mid-high of the scale, louder than a normal step
   const note = scale.notes[Math.min(5, scale.notes.length - 1)];
   playMalletNote(note, { gain: 0.65, duration: 0.85 });
 }
