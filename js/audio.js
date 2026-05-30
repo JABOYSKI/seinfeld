@@ -253,11 +253,113 @@ export const SCALES = [
     synth: { type: 'sawtooth', duration: 0.12, attack: 0.001, harmonic: 4, harmonicGain: 0.35, filter: 5500 } },
 ];
 
+// 15 scale-traversal patterns. Each `step(i, n)` takes the cell index and the
+// scale's note count and returns the conceptual "ascending step number" — a
+// non-negative integer that gets fed through the standard octave-wrap logic
+// (`step % n` for note, `floor(step / n)` for octave climb). That keeps long
+// chains naturally climbing in pitch regardless of which internal pattern
+// they use. Pattern #1 (ascending) is the original/default behavior.
+export const PATTERNS = [
+  { id: 'ascending',  name: 'Ascending',   blurb: 'Up the scale (default)',
+    step: (i) => i },
+  { id: 'descending', name: 'Descending',  blurb: 'Down within each octave',
+    step: (i, n) => Math.floor(i / n) * n + (n - 1 - (i % n)) },
+  { id: 'ping-pong',  name: 'Ping-Pong',   blurb: 'Up then down, climb octave',
+    step: (i, n) => {
+      const period = 2 * (n - 1);
+      const cycle = Math.floor(i / period);
+      const p = i % period;
+      const within = p < n ? p : 2 * (n - 1) - p;
+      return cycle * n + within;
+    } },
+  { id: 'pong-ping',  name: 'Pong-Ping',   blurb: 'Down then up, climb octave',
+    step: (i, n) => {
+      const period = 2 * (n - 1);
+      const cycle = Math.floor(i / period);
+      const p = i % period;
+      const within = p < n ? (n - 1 - p) : (p - (n - 1));
+      return cycle * n + within;
+    } },
+  { id: 'zigzag',     name: 'Zigzag',      blurb: 'Alternate low and high',
+    step: (i, n) => {
+      const cycle = Math.floor(i / n);
+      const k = i % n;
+      const within = (k % 2 === 0) ? Math.floor(k / 2) : n - 1 - Math.floor(k / 2);
+      return cycle * n + within;
+    } },
+  { id: 'spiral-out', name: 'Spiral Out',  blurb: 'From center outward',
+    step: (i, n) => {
+      const cycle = Math.floor(i / n);
+      const k = i % n;
+      const mid = Math.floor((n - 1) / 2);
+      let within;
+      if (k === 0) within = mid;
+      else if (k % 2 === 1) within = mid + Math.ceil(k / 2);
+      else within = mid - k / 2;
+      within = Math.max(0, Math.min(n - 1, within));
+      return cycle * n + within;
+    } },
+  { id: 'spiral-in',  name: 'Spiral In',   blurb: 'From edges inward',
+    step: (i, n) => {
+      const cycle = Math.floor(i / n);
+      const k = i % n;
+      const within = (k % 2 === 0) ? k / 2 : n - 1 - Math.floor(k / 2);
+      return cycle * n + within;
+    } },
+  { id: 'thirds',     name: 'Thirds',      blurb: 'Skip every other note',
+    step: (i, n) => {
+      const cycle = Math.floor(i / n);
+      const k = i % n;
+      const half = Math.floor(n / 2);
+      const within = (k < half) ? (k * 2) % n : (k * 2 - n + 1);
+      return cycle * n + within;
+    } },
+  { id: 'fourths',    name: 'Fourths',     blurb: 'Skip every two notes',
+    step: (i, n) => {
+      const cycle = Math.floor(i / n);
+      const k = i % n;
+      const within = (k * 3) % n;
+      return cycle * n + within;
+    } },
+  { id: 'arpeggio',   name: 'Arpeggio',    blurb: 'Triadic climb (1-3-5)',
+    step: (i) => {
+      const triadStep = i % 3;
+      const triad = Math.floor(i / 3);
+      return triad + triadStep * 2;
+    } },
+  { id: 'echo',       name: 'Echo',        blurb: 'Each note twice',
+    step: (i) => Math.floor(i / 2) },
+  { id: 'triplet',    name: 'Triplet',     blurb: 'Each note three times',
+    step: (i) => Math.floor(i / 3) },
+  { id: 'root-pedal', name: 'Root Pedal',  blurb: 'Root alternates with climb',
+    step: (i) => (i % 2 === 0) ? 0 : Math.floor(i / 2) + 1 },
+  { id: 'random',     name: 'Random',      blurb: 'Pseudo-random per cell',
+    step: (i, n) => {
+      const cycle = Math.floor(i / n);
+      const k = i % n;
+      // Deterministic 32-bit hash so the same chain plays the same notes.
+      const h = (Math.imul(k + 1, 2654435761) ^ Math.imul(cycle + 1, 40503)) >>> 0;
+      return cycle * n + (h % n);
+    } },
+  { id: 'mountain',   name: 'Mountain',    blurb: 'Climb half, descend half',
+    step: (i, n) => {
+      const half = Math.floor(n / 2);
+      const period = 2 * half;
+      const cycle = Math.floor(i / period);
+      const p = i % period;
+      const within = (p < half) ? p : (2 * half - 1 - p);
+      return cycle * n + within;
+    } },
+];
+
 export const DEFAULT_SOUND_ID = 'off';
+export const DEFAULT_PATTERN_ID = 'ascending';
 const STORAGE_KEY = 'seinfeld_sound_scale';
 const OCTAVE_STORAGE_KEY = 'seinfeld_sound_octave';
 const PITCH_STORAGE_KEY = 'seinfeld_sound_pitch';
+const PATTERN_STORAGE_KEY = 'seinfeld_sound_pattern';
 const VALID_IDS = new Set(SCALES.map(s => s.id));
+const VALID_PATTERN_IDS = new Set(PATTERNS.map(p => p.id));
 const MIN_OCTAVE = -4;   // wider downward range so low scales can rumble
 const MAX_OCTAVE = 3;
 const MIN_PITCH = -12;   // semitones — full octave each way for fine tuning
@@ -297,6 +399,19 @@ export function setPitchShift(n) {
 }
 export const OCTAVE_RANGE = { min: MIN_OCTAVE, max: MAX_OCTAVE };
 export const PITCH_RANGE  = { min: MIN_PITCH,  max: MAX_PITCH };
+// Selected scale-traversal pattern (which step to play at index i).
+export function getSelectedPatternId() {
+  const saved = localStorage.getItem(PATTERN_STORAGE_KEY);
+  return VALID_PATTERN_IDS.has(saved) ? saved : DEFAULT_PATTERN_ID;
+}
+export function setSelectedPatternId(id) {
+  if (!VALID_PATTERN_IDS.has(id)) return false;
+  localStorage.setItem(PATTERN_STORAGE_KEY, id);
+  return true;
+}
+export function getCurrentPattern() {
+  return PATTERNS.find(p => p.id === getSelectedPatternId()) || PATTERNS[0];
+}
 export function getCurrentScale() {
   return SCALES.find(s => s.id === getSelectedSoundId());
 }
@@ -389,8 +504,14 @@ function maxOctaveWrapForScale(scale) {
 function freqAt(scale, index) {
   const notes = scale.notes;
   const i = Math.max(0, index);
-  const octaveWrap = Math.min(Math.floor(i / notes.length), maxOctaveWrapForScale(scale));
-  const noteInOctave = i % notes.length;
+  // Patterns remap the cell index `i` into a virtual ascending step number
+  // (e.g. ping-pong rewrites 0,1,2,3 → 0,1,2,3,2,1,0,1,...). The wrap and
+  // shift math below then treats that step as if it came from a plain
+  // ascending sequence, so octave climb still works for any pattern.
+  const pattern = getCurrentPattern();
+  const step = Math.max(0, pattern.step(i, notes.length));
+  const octaveWrap = Math.min(Math.floor(step / notes.length), maxOctaveWrapForScale(scale));
+  const noteInOctave = step % notes.length;
   // Combined shift: chain auto-wrap + user's octave slider + pitch slider
   // (semitones converted to a fractional octave).
   const totalOctaves = octaveWrap + getOctaveShift() + getPitchShift() / 12;

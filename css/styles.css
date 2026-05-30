@@ -779,6 +779,24 @@ button { font: inherit; color: inherit; }
   min-width: 28px; text-align: right;
 }
 .sim-play { padding: 6px 14px; font-size: 12px; }
+.sim-select {
+  flex: 1;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.sim-pattern-blurb {
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: left;
+  min-width: 0;
+  flex: 0 1 auto;
+}
 .sim-hint {
   margin: 6px 0 0;
   font-size: 11px;

@@ -6,6 +6,7 @@ import {
   SCALES, getSelectedSoundId, setSelectedSoundId, playSimulation,
   getOctaveShift, setOctaveShift, OCTAVE_RANGE,
   getPitchShift, setPitchShift, PITCH_RANGE,
+  PATTERNS, getSelectedPatternId, setSelectedPatternId,
 } from './audio.js';
 
 export function openSoundPicker(onSelected) {
@@ -37,6 +38,13 @@ export function openSoundPicker(onSelected) {
           <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
           <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
         </div>
+        <label class="sim-label" for="simPattern">Pattern</label>
+        <div class="sim-row">
+          <select id="simPattern" class="sim-select">
+            ${PATTERNS.map(p => `<option value="${p.id}" ${p.id === getSelectedPatternId() ? 'selected' : ''} title="${p.blurb}">${p.name}</option>`).join('')}
+          </select>
+          <span class="sim-value sim-pattern-blurb" id="simPatternBlurb">${getPatternBlurb()}</span>
+        </div>
         <p class="sim-hint">Click any tile to hear it at these settings.</p>
       </div>
 
@@ -67,6 +75,8 @@ export function openSoundPicker(onSelected) {
   const simOctaveValue = overlay.querySelector('#simOctaveValue');
   const simPitch = overlay.querySelector('#simPitch');
   const simPitchValue = overlay.querySelector('#simPitchValue');
+  const simPattern = overlay.querySelector('#simPattern');
+  const simPatternBlurb = overlay.querySelector('#simPatternBlurb');
 
   simLength.addEventListener('input', () => { simValue.textContent = simLength.value; });
 
@@ -78,6 +88,13 @@ export function openSoundPicker(onSelected) {
   simPitch.addEventListener('input', () => {
     const v = setPitchShift(parseInt(simPitch.value, 10));
     simPitchValue.textContent = formatSigned(v);
+  });
+
+  simPattern.addEventListener('change', () => {
+    setSelectedPatternId(simPattern.value);
+    simPatternBlurb.textContent = getPatternBlurb();
+    // Auto-preview the new pattern with the current scale + length.
+    playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
   });
 
   simPlay.addEventListener('click', () => {
@@ -108,4 +125,10 @@ export function openSoundPicker(onSelected) {
 function formatSigned(v) {
   if (v === 0) return '0';
   return v > 0 ? `+${v}` : `${v}`;
+}
+
+function getPatternBlurb() {
+  const id = getSelectedPatternId();
+  const p = PATTERNS.find(x => x.id === id);
+  return p ? p.blurb : '';
 }
