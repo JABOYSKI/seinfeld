@@ -38,12 +38,28 @@ export function openSoundPicker(onSelected) {
           <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
           <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
         </div>
-        <label class="sim-label" for="simPattern">Pattern</label>
-        <div class="sim-row">
-          <select id="simPattern" class="sim-select">
-            ${PATTERNS.map(p => `<option value="${p.id}" ${p.id === getSelectedPatternId() ? 'selected' : ''} title="${p.blurb}">${p.name}</option>`).join('')}
-          </select>
-          <span class="sim-value sim-pattern-blurb" id="simPatternBlurb">${getPatternBlurb()}</span>
+        <label class="sim-label" for="patternTrigger">Pattern</label>
+        <div class="sim-row pattern-row">
+          <div class="pattern-picker-wrap">
+            <button type="button" class="pattern-picker-trigger" id="patternTrigger"
+                    aria-haspopup="listbox" aria-expanded="false">
+              <span class="pattern-trigger-name" id="patternTriggerName">${getPatternName()}</span>
+              <span class="pattern-trigger-blurb" id="patternTriggerBlurb">${getPatternBlurb()}</span>
+              <span class="pattern-trigger-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="pattern-picker-panel" id="patternPanel" role="listbox" hidden>
+              ${PATTERNS.map(p => `
+                <button type="button"
+                        class="pattern-option ${p.id === getSelectedPatternId() ? 'is-selected' : ''}"
+                        data-pattern="${p.id}"
+                        role="option"
+                        aria-selected="${p.id === getSelectedPatternId()}">
+                  <span class="pattern-option-name">${p.name}</span>
+                  <span class="pattern-option-blurb">${p.blurb}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
         </div>
         <p class="sim-hint">Click any tile to hear it at these settings.</p>
       </div>
@@ -75,8 +91,10 @@ export function openSoundPicker(onSelected) {
   const simOctaveValue = overlay.querySelector('#simOctaveValue');
   const simPitch = overlay.querySelector('#simPitch');
   const simPitchValue = overlay.querySelector('#simPitchValue');
-  const simPattern = overlay.querySelector('#simPattern');
-  const simPatternBlurb = overlay.querySelector('#simPatternBlurb');
+  const patternTrigger = overlay.querySelector('#patternTrigger');
+  const patternPanel = overlay.querySelector('#patternPanel');
+  const patternTriggerName = overlay.querySelector('#patternTriggerName');
+  const patternTriggerBlurb = overlay.querySelector('#patternTriggerBlurb');
 
   simLength.addEventListener('input', () => { simValue.textContent = simLength.value; });
 
@@ -90,11 +108,40 @@ export function openSoundPicker(onSelected) {
     simPitchValue.textContent = formatSigned(v);
   });
 
-  simPattern.addEventListener('change', () => {
-    setSelectedPatternId(simPattern.value);
-    simPatternBlurb.textContent = getPatternBlurb();
-    // Auto-preview the new pattern with the current scale + length.
-    playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
+  const closePatternPanel = () => {
+    patternPanel.hidden = true;
+    patternTrigger.setAttribute('aria-expanded', 'false');
+  };
+  const openPatternPanel = () => {
+    patternPanel.hidden = false;
+    patternTrigger.setAttribute('aria-expanded', 'true');
+  };
+  patternTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (patternPanel.hidden) openPatternPanel(); else closePatternPanel();
+  });
+  patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = opt.dataset.pattern;
+      setSelectedPatternId(id);
+      patternPanel.querySelectorAll('.pattern-option').forEach(o => {
+        const sel = o === opt;
+        o.classList.toggle('is-selected', sel);
+        o.setAttribute('aria-selected', sel ? 'true' : 'false');
+      });
+      patternTriggerName.textContent = getPatternName();
+      patternTriggerBlurb.textContent = getPatternBlurb();
+      closePatternPanel();
+      // Auto-preview the new pattern with the current scale + length.
+      playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
+    });
+  });
+  // Click anywhere else inside the modal closes the panel.
+  overlay.addEventListener('click', (e) => {
+    if (!patternPanel.hidden && !patternPanel.contains(e.target) && e.target !== patternTrigger && !patternTrigger.contains(e.target)) {
+      closePatternPanel();
+    }
   });
 
   simPlay.addEventListener('click', () => {
@@ -131,4 +178,10 @@ function getPatternBlurb() {
   const id = getSelectedPatternId();
   const p = PATTERNS.find(x => x.id === id);
   return p ? p.blurb : '';
+}
+
+function getPatternName() {
+  const id = getSelectedPatternId();
+  const p = PATTERNS.find(x => x.id === id);
+  return p ? p.name : '';
 }
