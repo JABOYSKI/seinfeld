@@ -4,6 +4,7 @@
 // cascade's adaptiveStep).
 import {
   SCALES, getSelectedSoundId, setSelectedSoundId, playSimulation,
+  getOctaveShift, setOctaveShift, OCTAVE_RANGE,
 } from './audio.js';
 
 export function openSoundPicker(onSelected) {
@@ -25,7 +26,12 @@ export function openSoundPicker(onSelected) {
           <span class="sim-value" id="simLengthValue">8</span>
           <button type="button" class="btn btn-primary sim-play" id="simPlay">Play</button>
         </div>
-        <p class="sim-hint">Click any tile to hear it at this length.</p>
+        <label class="sim-label" for="simOctave">Octave shift</label>
+        <div class="sim-row">
+          <input type="range" id="simOctave" min="${OCTAVE_RANGE.min}" max="${OCTAVE_RANGE.max}" step="1" value="${getOctaveShift()}" />
+          <span class="sim-value" id="simOctaveValue">${formatOctave(getOctaveShift())}</span>
+        </div>
+        <p class="sim-hint">Click any tile to hear it at these settings.</p>
       </div>
 
       <div class="picker-grid picker-grid-sound" id="soundPickerGrid">
@@ -51,8 +57,15 @@ export function openSoundPicker(onSelected) {
   const simLength = overlay.querySelector('#simLength');
   const simValue = overlay.querySelector('#simLengthValue');
   const simPlay = overlay.querySelector('#simPlay');
+  const simOctave = overlay.querySelector('#simOctave');
+  const simOctaveValue = overlay.querySelector('#simOctaveValue');
 
   simLength.addEventListener('input', () => { simValue.textContent = simLength.value; });
+
+  simOctave.addEventListener('input', () => {
+    const v = setOctaveShift(parseInt(simOctave.value, 10));
+    simOctaveValue.textContent = formatOctave(v);
+  });
 
   simPlay.addEventListener('click', () => {
     playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
@@ -77,4 +90,9 @@ export function openSoundPicker(onSelected) {
     if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
   };
   document.addEventListener('keydown', onKey);
+}
+
+function formatOctave(v) {
+  if (v === 0) return '0';
+  return v > 0 ? `+${v}` : `${v}`;
 }

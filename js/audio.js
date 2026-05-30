@@ -122,7 +122,10 @@ export const SCALES = [
 
 export const DEFAULT_SOUND_ID = 'off';
 const STORAGE_KEY = 'seinfeld_sound_scale';
+const OCTAVE_STORAGE_KEY = 'seinfeld_sound_octave';
 const VALID_IDS = new Set(SCALES.map(s => s.id));
+const MIN_OCTAVE = -2;
+const MAX_OCTAVE = 2;
 
 export function getSelectedSoundId() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -133,6 +136,20 @@ export function setSelectedSoundId(id) {
   localStorage.setItem(STORAGE_KEY, id);
   return true;
 }
+// Octave shift (-2..+2) — multiplies every note frequency by 2^shift. Applied
+// inside freqAt so it affects playNoteAt, playChord, playBurst, and the
+// picker's simulator equally.
+export function getOctaveShift() {
+  const v = parseInt(localStorage.getItem(OCTAVE_STORAGE_KEY), 10);
+  if (Number.isNaN(v) || v < MIN_OCTAVE || v > MAX_OCTAVE) return 0;
+  return v;
+}
+export function setOctaveShift(n) {
+  const v = Math.max(MIN_OCTAVE, Math.min(MAX_OCTAVE, Math.round(n)));
+  localStorage.setItem(OCTAVE_STORAGE_KEY, String(v));
+  return v;
+}
+export const OCTAVE_RANGE = { min: MIN_OCTAVE, max: MAX_OCTAVE };
 export function getCurrentScale() {
   return SCALES.find(s => s.id === getSelectedSoundId());
 }
@@ -213,7 +230,8 @@ function freqAt(scale, index) {
   const i = Math.max(0, index);
   const octave = Math.min(Math.floor(i / notes.length), MAX_OCTAVE_SHIFT);
   const noteInOctave = i % notes.length;
-  return notes[noteInOctave] * Math.pow(2, octave);
+  // User-selected octave shift on top of the auto octave-wrap for long chains.
+  return notes[noteInOctave] * Math.pow(2, octave + getOctaveShift());
 }
 export function playNoteAt(index, opts = {}) {
   const scale = getCurrentScale();
@@ -231,7 +249,7 @@ export function playChord(count) {
   const synth = scale.synth || {};
   const n = Math.min(count, scale.notes.length);
   for (let i = 0; i < n; i++) {
-    playMalletNote(scale.notes[i], { ...synth, gain: 0.42 / Math.sqrt(n) });
+    playMalletNote(freqAt(scale, i), { ...synth, gain: 0.42 / Math.sqrt(n) });
   }
 }
 
@@ -240,8 +258,7 @@ export function playBurst() {
   const scale = getCurrentScale();
   if (!scale || !scale.notes) return;
   const synth = scale.synth || {};
-  const note = scale.notes[Math.min(5, scale.notes.length - 1)];
-  playMalletNote(note, { ...synth, gain: 0.65 });
+  playMalletNote(freqAt(scale, Math.min(5, scale.notes.length - 1)), { ...synth, gain: 0.65 });
 }
 
 // Simulator-style preview: play a full chain of `length` notes using the
