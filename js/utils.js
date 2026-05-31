@@ -20,6 +20,16 @@ export function toast(msg, kind = 'info') {
   }, TOAST_DURATION_MS);
 }
 
+// --- HTML escaping --------------------------------------------------------
+// Single shared copy for escaping user-supplied text before it goes into an
+// innerHTML template. (Some modules still carry local duplicates; migrate
+// them here over time.) escapeAttr is an alias — the same entity set is safe
+// inside a double-quoted attribute value.
+export function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+export function escapeAttr(s) { return escapeHTML(s); }
+
 // --- Date helpers ---------------------------------------------------------
 // Everything is done in local time. ISO strings here are 'YYYY-MM-DD' (no
 // time component) so the user's local "today" is what Supabase stores.

@@ -10,17 +10,22 @@ export async function loadCompletions(habitId, year) {
 // Same as loadCompletions but spans a multi-year window. Used by the
 // continuous strip view which renders 5 years at once.
 export async function loadCompletionsInRange(habitId, fromYear, toYear) {
-  const from = `${fromYear}-01-01`;
-  const to   = `${toYear}-12-31`;
+  return loadCompletionsBetween(habitId, `${fromYear}-01-01`, `${toYear}-12-31`);
+}
+
+// Load completed days for one habit between two inclusive 'YYYY-MM-DD' dates.
+// Used for today-anchored current-streak math, which must span year
+// boundaries independently of the calendar grid's per-year fetch.
+export async function loadCompletionsBetween(habitId, fromISO, toISO) {
   const { data, error } = await withTimeout(
     supabase
       .from('completions')
       .select('day')
       .eq('habit_id', habitId)
-      .gte('day', from)
-      .lte('day', to),
+      .gte('day', fromISO)
+      .lte('day', toISO),
     8000,
-    'loadCompletionsInRange'
+    'loadCompletionsBetween'
   );
   if (error) throw error;
   return new Set((data || []).map(r => r.day));

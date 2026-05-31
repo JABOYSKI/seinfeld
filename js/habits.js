@@ -80,6 +80,23 @@ export function normalizeTextColor(value) {
   return DEFAULT_TEXT_COLOR;
 }
 
+export const DEFAULT_COLOR = COLORS[0];
+
+// Normalize a habit color the same way as text color. This is also a security
+// boundary: habit.color is interpolated raw into style="..." inside innerHTML
+// templates (tabs, day-cell slices, the delete dialog), so an un-hex value
+// containing a quote could break out of the attribute. Forcing it to #rrggbb
+// on write closes that at the source.
+export function normalizeColor(value) {
+  if (typeof value !== 'string') return DEFAULT_COLOR;
+  const v = value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+  if (/^#[0-9a-fA-F]{3}$/.test(v)) {
+    return ('#' + v.slice(1).split('').map(c => c + c).join('')).toLowerCase();
+  }
+  return DEFAULT_COLOR;
+}
+
 export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE_ID, textColor = DEFAULT_TEXT_COLOR) {
   // Place new habit at the end. Cheap to compute client-side because the
   // user can only have a handful of habits (capped at 5 in UI).
@@ -91,7 +108,8 @@ export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE
   // locks every cell with "habit didn't exist yet."
   const created_at = todayISO();
   const row = {
-    user_id: userId, name, color, sort_order, created_at,
+    user_id: userId, name, sort_order, created_at,
+    color: normalizeColor(color),
     texture: normalizeTexture(texture),
     text_color: normalizeTextColor(textColor),
   };
@@ -123,12 +141,17 @@ export async function repairFutureCreatedDates(userId) {
 }
 
 export async function updateHabit(id, fields) {
+  // Normalize the color fields on write too (not just create) — both feed
+  // raw into style="..." innerHTML sinks, so this is the security boundary.
+  const body = { ...fields };
+  if ('color' in body) body.color = normalizeColor(body.color);
+  if ('text_color' in body) body.text_color = normalizeTextColor(body.text_color);
   return await withColumnFallback(
-    (body) => withTimeout(
-      supabase.from('habits').update(body).eq('id', id).select().single(),
+    (buildBody) => withTimeout(
+      supabase.from('habits').update(buildBody).eq('id', id).select().single(),
       8000, 'updateHabit'
     ),
-    fields, 'updateHabit'
+    body, 'updateHabit'
   );
 }
 

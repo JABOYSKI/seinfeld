@@ -6,7 +6,7 @@
 import {
   MONTH_SHORT, WEEKDAY_LETTERS,
   daysInMonth, firstWeekdayOfMonth, ordinalWeekOfYear,
-  todayISO, canEditDay, daysBetween,
+  todayISO, canEditDay, daysBetween, escapeAttr,
 } from './utils.js';
 import { normalizeTexture } from './textures.js';
 
@@ -265,7 +265,7 @@ function renderDay(iso, dayNum, habit, completions, today, habitCreated) {
   else if (!editable && !done) title = `${iso} — can only backfill the last 3 days`;
   else if (!editable && done) title = `${iso} — locked (click to un-fill with confirmation)`;
 
-  return `<button type="button" class="${classes.join(' ')}" data-day="${iso}" title="${title}"${clickable ? '' : ' disabled'}>
+  return `<button type="button" class="${classes.join(' ')}" data-day="${iso}" title="${escapeAttr(title)}"${clickable ? '' : ' disabled'}>
     <span class="day-num">${dayNum}</span>
   </button>`;
 }
@@ -314,7 +314,7 @@ function renderAllDay(iso, dayNum, habits, completionsByHabit, today) {
     return `<span class="day-slice${s.done ? ' day-slice-done' : ''}${s.existed ? '' : ' day-slice-pre'}${txClass}" style="--c:${s.habit.color}"></span>`;
   }).join('');
 
-  return `<div class="${classes.join(' ')}" data-day="${iso}" title="${title}">
+  return `<div class="${classes.join(' ')}" data-day="${iso}" title="${escapeAttr(title)}">
     <span class="day-slices">${slicesHTML}</span>
     <span class="day-num">${dayNum}</span>
   </div>`;

@@ -3,7 +3,7 @@ import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js'
 import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS, DEFAULT_TEXT_COLOR, normalizeTextColor, migrationFileForColumn } from './habits.js';
 import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 import { buildColorWheel } from './colorWheel.js';
-import { loadCompletions, loadCompletionsInRange, markDay, unmarkDay } from './completions.js';
+import { loadCompletions, loadCompletionsInRange, loadCompletionsBetween, markDay, unmarkDay } from './completions.js';
 import { renderCalendar, renderAllCalendar, renderContinuousCalendar, renderContinuousAllCalendar, CONTINUOUS_YEARS } from './calendar.js';
 import { currentStreak, longestStreak } from './streak.js';
 
@@ -27,8 +27,16 @@ const state = {
   // real UUID = the single-habit view for that habit.
   currentHabitId: null,
   currentYear: new Date().getFullYear(),
-  completions: new Set(),                 // single-mode: one habit's completions
-  completionsByHabit: new Map(),          // all-mode: habitId -> Set<dayISO>
+  completions: new Set(),                 // single-mode: one habit's completions (viewed year)
+  completionsByHabit: new Map(),          // all-mode: habitId -> Set<dayISO> (viewed year)
+  // Today-anchored set (created_at..today) for the ACTIVE habit, used for
+  // current/longest streak math so a chain that crosses New Year — or is
+  // viewed from a past year — counts correctly, independent of the grid's
+  // per-year fetch. Cached by habit id so year navigation doesn't refetch.
+  streakSet: new Set(),
+  streakSetHabitId: null,
+  // Same today-anchored sets, per habit, for the Symphony (all chains at once).
+  streakSetByHabit: new Map(),
 };
 
 const ALL_VIEW_ID = 'all';
@@ -427,6 +435,12 @@ function wireTabDragReorder() {
   });
 }
 
+// Monotonic token shared by the calendar loaders. A tab switch or year change
+// fires loadAndRender* WITHOUT awaiting, so two loads can be in flight at once;
+// after each await we bail unless we're still the newest load, so a slow
+// earlier fetch can't paint stale data over a newer one.
+let _renderToken = 0;
+
 async function loadAndRenderCalendar() {
   if (state.currentHabitId === ALL_VIEW_ID) {
     await loadAndRenderAllCalendar();
@@ -434,17 +448,37 @@ async function loadAndRenderCalendar() {
   }
   const habit = state.habits.find(h => h.id === state.currentHabitId);
   if (!habit) return;
+  const token = ++_renderToken;
   const continuous = getViewMode() === 'continuous';
+  // streakSet covers created_at..today and is year-independent, so refetch it
+  // only when the active habit changes — year navigation reuses the cache
+  // (which also carries any optimistic toggles made since the load).
+  const needStreakSet = state.streakSetHabitId !== habit.id;
   try {
     // Continuous spans CONTINUOUS_YEARS years STARTING at currentYear so
     // toggling between views keeps the focused year stable (the year shown
     // in months mode === the first year shown in continuous mode).
-    state.completions = continuous
-      ? await loadCompletionsInRange(habit.id, state.currentYear, state.currentYear + (CONTINUOUS_YEARS - 1))
-      : await loadCompletions(habit.id, state.currentYear);
+    const gridP = continuous
+      ? loadCompletionsInRange(habit.id, state.currentYear, state.currentYear + (CONTINUOUS_YEARS - 1))
+      : loadCompletions(habit.id, state.currentYear);
+    const streakP = needStreakSet
+      ? loadCompletionsBetween(habit.id, habit.created_at, todayISO())
+      : Promise.resolve(state.streakSet);
+    const [gridSet, streakSet] = await Promise.all([gridP, streakP]);
+    if (token !== _renderToken) return;           // a newer load superseded us
+    state.completions = gridSet;
+    state.streakSet = streakSet;
+    state.streakSetHabitId = habit.id;
   } catch (e) {
+    if (token !== _renderToken) return;
     toast(`Failed to load days: ${e.message}`, 'error');
     state.completions = new Set();
+    // Leave the streak cache INVALID (not habit.id) so a transient failure
+    // isn't remembered as a valid-but-empty set: the next render retries the
+    // fetch, and renderStreak/onCalendarClick fall back to the grid set
+    // meanwhile instead of mutating a known-bad streakSet.
+    state.streakSet = new Set();
+    state.streakSetHabitId = null;
   }
   if (continuous) {
     renderContinuousCalendar(els.calendar, habit, state.completions, state.currentYear);
@@ -497,6 +531,7 @@ async function loadAndRenderAllCalendar() {
   // Fire all per-habit fetches in parallel — small N (max 5) keeps this cheap.
   // Continuous mode spans CONTINUOUS_YEARS years starting at currentYear,
   // matching single-habit continuous behavior.
+  const token = ++_renderToken;
   const continuous = getViewMode() === 'continuous';
   const fromYear = state.currentYear;
   const toYear   = continuous ? state.currentYear + (CONTINUOUS_YEARS - 1) : state.currentYear;
@@ -506,8 +541,10 @@ async function loadAndRenderAllCalendar() {
         loadCompletionsInRange(h.id, fromYear, toYear).then(set => [h.id, set])
       )
     );
+    if (token !== _renderToken) return;           // a newer load superseded us
     state.completionsByHabit = new Map(results);
   } catch (e) {
+    if (token !== _renderToken) return;
     toast(`Failed to load days: ${e.message}`, 'error');
     state.completionsByHabit = new Map();
   }
@@ -520,28 +557,23 @@ async function loadAndRenderAllCalendar() {
   renderAllSummary();
 }
 
-// Ensures every habit's completions Set is present in state.completionsByHabit
-// so the symphony can compute streaks for all of them, regardless of which
-// view the user is currently in. The single-habit view only loads the active
-// habit's data, so we fold its set in and fetch the rest.
-async function ensureAllCompletionsLoaded() {
-  if (state.currentHabitId && state.currentHabitId !== ALL_VIEW_ID) {
-    state.completionsByHabit.set(state.currentHabitId, state.completions);
+// Ensures every habit has a today-anchored streak Set (created_at..today) in
+// state.streakSetByHabit, so the Symphony computes each chain's TRUE current
+// length regardless of the viewed year or a New-Year boundary. Reuses the
+// active habit's already-loaded streakSet and fetches the rest.
+async function ensureStreakSetsLoaded() {
+  if (state.streakSetHabitId) {
+    state.streakSetByHabit.set(state.streakSetHabitId, state.streakSet);
   }
-  const missing = state.habits.filter(h => !state.completionsByHabit.has(h.id));
+  const missing = state.habits.filter(h => !state.streakSetByHabit.has(h.id));
   if (missing.length === 0) return;
-  const continuous = getViewMode() === 'continuous';
-  const fromYear = state.currentYear;
-  const toYear = continuous ? state.currentYear + (CONTINUOUS_YEARS - 1) : state.currentYear;
+  const today = todayISO();
   const results = await Promise.all(
     missing.map(h =>
-      (continuous
-        ? loadCompletionsInRange(h.id, fromYear, toYear)
-        : loadCompletions(h.id, fromYear)
-      ).then(set => [h.id, set])
+      loadCompletionsBetween(h.id, h.created_at, today).then(set => [h.id, set])
     )
   );
-  for (const [id, set] of results) state.completionsByHabit.set(id, set);
+  for (const [id, set] of results) state.streakSetByHabit.set(id, set);
 }
 
 // Fires every habit's current chain at once. Chains start with a small
@@ -565,7 +597,7 @@ function symphonyStepFor(cellCount) {
 async function playSymphony(btn) {
   if (!state.habits.length) { toast('No habits yet — create one first.', 'info'); return; }
   try {
-    await ensureAllCompletionsLoaded();
+    await ensureStreakSetsLoaded();
   } catch (e) {
     toast(`Couldn't load chains: ${e.message}`, 'error');
     return;
@@ -575,7 +607,7 @@ async function playSymphony(btn) {
   const yesterday = daysAgoISO(1);
   const playable = [];
   for (const habit of state.habits) {
-    const set = state.completionsByHabit.get(habit.id);
+    const set = state.streakSetByHabit.get(habit.id);
     if (!set || set.size === 0) continue;
     const streak = currentStreak(set, habit.created_at);
     if (streak < 2) continue;
@@ -634,11 +666,13 @@ async function playSymphony(btn) {
 }
 
 function renderStreak(habit) {
-  // For accurate current-streak math we need completions for the prior year
-  // too (a chain can cross New Year). Cheap follow-up fetch only when the
-  // viewed year is current and the streak might extend back.
-  const cur = currentStreak(state.completions, habit.created_at);
-  const longest = longestStreak(state.completions);
+  // Compute both streaks from the today-anchored set (created_at..today) so a
+  // chain that crosses New Year — or is viewed from a past year — counts
+  // correctly, and "longest" means all-time rather than within-the-viewed-year.
+  // Fall back to the grid set only before the streak fetch has landed.
+  const src = state.streakSetHabitId === habit.id ? state.streakSet : state.completions;
+  const cur = currentStreak(src, habit.created_at);
+  const longest = longestStreak(src);
   els.streakChip.innerHTML = `
     <span class="streak-current">current <b>${cur}</b></span>
     <span class="streak-sep">·</span>
@@ -708,9 +742,17 @@ async function onCalendarClick(e) {
     if (!ok) return;
   }
 
+  // Mirror the toggle into the today-anchored streakSet too, so the streak
+  // chip and chain detection stay correct (and cross-year-aware) without a
+  // refetch. Only visible (current-year, in-window) cells are clickable, so
+  // they always fall inside the streakSet's created_at..today range.
+  const useStreakSet = state.streakSetHabitId === habit.id;
+  const streakSrc = useStreakSet ? state.streakSet : state.completions;
+
   // Optimistic UI: flip immediately, revert on error.
   if (wasDone) {
     state.completions.delete(day);
+    if (useStreakSet) state.streakSet.delete(day);
     // Strip any fill-* class along with done/flash so the cell goes inert.
     cell.classList.remove('day-done', 'day-just-filled');
     cell.className = cell.className.replace(/\bfill-[a-z-]+\b/g, '').replace(/\s+/g, ' ').trim();
@@ -720,16 +762,18 @@ async function onCalendarClick(e) {
     // — covers both filling today AND backfilling a past day that links
     // yesterday's fill to today's. The animation always plays on today's
     // cell because that's where the chain ends.
-    const oldStreak = currentStreak(state.completions, habit.created_at);
+    const oldStreak = currentStreak(streakSrc, habit.created_at);
     state.completions.add(day);
+    if (useStreakSet) state.streakSet.add(day);
     cell.classList.add('day-done');
     playFillAnimation(cell);
-    const newStreak = currentStreak(state.completions, habit.created_at);
+    const newStreak = currentStreak(streakSrc, habit.created_at);
     if (newStreak > oldStreak && newStreak >= 2) {
       // Anchor on the cell that was just clicked — that's where the user's
       // attention is and (in their mental model) the new end of the chain.
       // The old behavior anchored on today, which felt wrong when filling
-      // yesterday with today still empty.
+      // yesterday with today still empty. The animation skips any chain cells
+      // that fall outside the loaded grid (e.g. a streak reaching last year).
       playChainAnimation(els.calendar, newStreak, habit, day, state.completions);
     }
   }
@@ -740,8 +784,15 @@ async function onCalendarClick(e) {
     else         await markDay(habit.id, getUser().id, day);
   } catch (err) {
     toast(`Save failed: ${err.message}`, 'error');
-    if (wasDone) { state.completions.add(day); cell.classList.add('day-done'); }
-    else         { state.completions.delete(day); cell.classList.remove('day-done'); }
+    if (wasDone) {
+      state.completions.add(day);
+      if (useStreakSet) state.streakSet.add(day);
+      cell.classList.add('day-done');
+    } else {
+      state.completions.delete(day);
+      if (useStreakSet) state.streakSet.delete(day);
+      cell.classList.remove('day-done');
+    }
     renderStreak(habit);
   }
 }
