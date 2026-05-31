@@ -83,6 +83,35 @@ function setShowWeekNumbers(v) {
   localStorage.setItem(WEEK_NUM_STORAGE_KEY, v ? 'true' : 'false');
 }
 
+// User's preferred tab order (drag-reorder). Stored client-side because
+// it's a per-device UI preference, not data semantics. Unknown IDs go to
+// the end so freshly-created habits still appear.
+const HABIT_ORDER_STORAGE_KEY = 'seinfeld_habit_order';
+function getStoredHabitOrder() {
+  try {
+    const raw = localStorage.getItem(HABIT_ORDER_STORAGE_KEY);
+    if (!raw) return [];
+    const ids = JSON.parse(raw);
+    return Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : [];
+  } catch { return []; }
+}
+function setStoredHabitOrder(ids) {
+  localStorage.setItem(HABIT_ORDER_STORAGE_KEY, JSON.stringify(ids));
+}
+function applyStoredHabitOrder(habits) {
+  const order = getStoredHabitOrder();
+  if (order.length === 0) return habits;
+  const byId = new Map(habits.map(h => [h.id, h]));
+  const sorted = [];
+  for (const id of order) {
+    if (byId.has(id)) { sorted.push(byId.get(id)); byId.delete(id); }
+  }
+  for (const h of habits) {
+    if (byId.has(h.id)) sorted.push(h);
+  }
+  return sorted;
+}
+
 const els = {
   boot: document.getElementById('bootSplash'),
   authMount: document.getElementById('authMount'),
@@ -263,7 +292,7 @@ async function loadAndRenderHabits() {
   try {
     const fixed = await repairFutureCreatedDates(user.id);
     if (fixed > 0) toast(`Fixed ${fixed} habit start date${fixed > 1 ? 's' : ''}.`, 'info');
-    state.habits = await loadHabits(user.id);
+    state.habits = applyStoredHabitOrder(await loadHabits(user.id));
   } catch (e) {
     toast(`Failed to load habits: ${e.message}`, 'error');
     state.habits = [];
@@ -302,6 +331,8 @@ function renderTabs() {
   const tabs = state.habits.map(h => `
     <button class="tab ${h.id === state.currentHabitId ? 'tab-active' : ''}"
             data-habit="${h.id}"
+            draggable="true"
+            title="Drag to reorder"
             style="--tab-color:${h.color};--tab-text-color:${h.text_color || '#ffffff'}">
       <span class="tab-dot"></span>
       <span class="tab-name">${escapeHTML(h.name)}</span>
@@ -333,6 +364,63 @@ function renderTabs() {
     });
   });
   document.getElementById('tabAdd')?.addEventListener('click', () => openHabitDialog());
+  wireTabDragReorder();
+}
+
+// HTML5 drag-and-drop for habit tabs. Only real habits can be dragged; the
+// 'All' tab is fixed at the front and the 'Add' button stays at the end.
+// On drop, the new order is saved to localStorage and applied to state.
+let _dragHabitId = null;
+function wireTabDragReorder() {
+  els.tabs.querySelectorAll('.tab[data-habit]').forEach(tab => {
+    const habitId = tab.dataset.habit;
+    if (habitId === ALL_VIEW_ID) { tab.draggable = false; return; }
+
+    tab.addEventListener('dragstart', (e) => {
+      _dragHabitId = habitId;
+      tab.classList.add('is-dragging');
+      try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', habitId);
+      } catch {}
+    });
+    tab.addEventListener('dragend', () => {
+      tab.classList.remove('is-dragging');
+      _dragHabitId = null;
+      els.tabs.querySelectorAll('.tab').forEach(t => {
+        t.classList.remove('drop-before', 'drop-after');
+      });
+    });
+    tab.addEventListener('dragover', (e) => {
+      if (!_dragHabitId || _dragHabitId === habitId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = tab.getBoundingClientRect();
+      const isBefore = e.clientX < rect.left + rect.width / 2;
+      tab.classList.toggle('drop-before', isBefore);
+      tab.classList.toggle('drop-after', !isBefore);
+    });
+    tab.addEventListener('dragleave', () => {
+      tab.classList.remove('drop-before', 'drop-after');
+    });
+    tab.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (!_dragHabitId || _dragHabitId === habitId) return;
+      const insertBefore = tab.classList.contains('drop-before');
+      tab.classList.remove('drop-before', 'drop-after');
+
+      const fromIdx = state.habits.findIndex(h => h.id === _dragHabitId);
+      if (fromIdx === -1) return;
+      const [moved] = state.habits.splice(fromIdx, 1);
+      let toIdx = state.habits.findIndex(h => h.id === habitId);
+      if (toIdx === -1) { state.habits.splice(fromIdx, 0, moved); return; }
+      if (!insertBefore) toIdx++;
+      state.habits.splice(toIdx, 0, moved);
+
+      setStoredHabitOrder(state.habits.map(h => h.id));
+      renderTabs();
+    });
+  });
 }
 
 async function loadAndRenderCalendar() {
@@ -603,11 +691,18 @@ async function onCalendarClick(e) {
   const day = cell.dataset.day;
   const habit = state.habits.find(h => h.id === state.currentHabitId);
   if (!habit) return;
-  if (!canEditDay(day, habit.created_at)) {
-    toast('That day is locked.', 'info');
-    return;
-  }
   const wasDone = state.completions.has(day);
+  if (!canEditDay(day, habit.created_at)) {
+    // Outside the edit window. Empty cells stay locked (can't retroactively
+    // "do" a habit) but filled cells can be unfilled with a confirm — they
+    // may want to correct an old miscount.
+    if (!wasDone) {
+      toast('That day is locked. Can only fill the last 3 days.', 'info');
+      return;
+    }
+    const ok = await confirmUnfillOldCell(day, habit);
+    if (!ok) return;
+  }
 
   // Optimistic UI: flip immediately, revert on error.
   if (wasDone) {
@@ -645,6 +740,46 @@ async function onCalendarClick(e) {
     else         { state.completions.delete(day); cell.classList.remove('day-done'); }
     renderStreak(habit);
   }
+}
+
+// Modal that asks the user to confirm un-filling a cell outside the normal
+// edit window. Resolves true if confirmed, false if cancelled.
+function confirmUnfillOldCell(dayISO, habit) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.innerHTML = `
+      <div class="dialog dialog-confirm" role="dialog" aria-modal="true">
+        <h2>Un-fill this day?</h2>
+        <p class="confirm-day">
+          <span class="confirm-swatch" style="background:${habit.color}"></span>
+          <span><b>${escapeHTML(habit.name)}</b> &middot; ${dayISO}</span>
+        </p>
+        <p class="confirm-body">
+          This day is outside your 3-day edit window. Un-filling it will
+          <b>break the chain</b> that runs through it. You can't undo this
+          — to re-fill, you'd have to do it within the next 3 days.
+        </p>
+        <div class="dlg-actions">
+          <button class="btn" id="ufCancel" type="button">Keep it</button>
+          <button class="btn btn-danger" id="ufConfirm" type="button">Un-fill</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const finish = (yes) => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(yes);
+    };
+    overlay.querySelector('#ufCancel').addEventListener('click', () => finish(false));
+    overlay.querySelector('#ufConfirm').addEventListener('click', () => finish(true));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) finish(false); });
+    const onKey = (e) => { if (e.key === 'Escape') finish(false); };
+    document.addEventListener('keydown', onKey);
+    // Default focus on Cancel so an accidental Enter doesn't destroy data.
+    overlay.querySelector('#ufCancel').focus();
+  });
 }
 
 // ---- Habit create/edit dialog -------------------------------------------

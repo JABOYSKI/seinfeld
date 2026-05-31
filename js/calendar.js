@@ -243,6 +243,10 @@ function renderDay(iso, dayNum, habit, completions, today, habitCreated) {
   const preCreation = daysBetween(habitCreated, iso) < 0;
   const editable = canEditDay(iso, habitCreated);
   const isToday = iso === today;
+  // Filled cells outside the edit window are still clickable so the user
+  // can un-fill them (with a confirm). Empty locked cells stay disabled
+  // because you can't retroactively "do" a habit.
+  const clickable = editable || done;
 
   const classes = ['day'];
   if (done) {
@@ -251,7 +255,7 @@ function renderDay(iso, dayNum, habit, completions, today, habitCreated) {
   }
   if (future) classes.push('day-future');
   if (preCreation) classes.push('day-pre');
-  if (editable) classes.push('day-clickable');
+  if (clickable) classes.push('day-clickable');
   if (isToday) classes.push('day-today');
   if (!done && !editable && !future && !preCreation) classes.push('day-locked');
 
@@ -259,9 +263,9 @@ function renderDay(iso, dayNum, habit, completions, today, habitCreated) {
   if (preCreation) title = `${iso} — habit didn't exist yet`;
   else if (future) title = `${iso} — in the future`;
   else if (!editable && !done) title = `${iso} — can only backfill the last 3 days`;
-  else if (!editable && done) title = `${iso} — locked (older than 3 days)`;
+  else if (!editable && done) title = `${iso} — locked (click to un-fill with confirmation)`;
 
-  return `<button type="button" class="${classes.join(' ')}" data-day="${iso}" title="${title}"${editable ? '' : ' disabled'}>
+  return `<button type="button" class="${classes.join(' ')}" data-day="${iso}" title="${title}"${clickable ? '' : ' disabled'}>
     <span class="day-num">${dayNum}</span>
   </button>`;
 }

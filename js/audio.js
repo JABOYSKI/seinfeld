@@ -56,6 +56,17 @@ export const SCALES = [
   { id: 'harmonic-minor', name: 'Harmonic Minor',   blurb: 'Dramatic, brooding', notes: [262, 294, 311, 349, 392, 415, 494, 523, 587, 622] },
   { id: 'blues',          name: 'Blues',            blurb: 'Bluesy with flat-5', notes: [262, 311, 349, 370, 392, 466, 523, 622, 698, 740] },
   { id: 'major-hepta',    name: 'Major Heptatonic', blurb: 'Full bright scale',  notes: [262, 294, 330, 349, 392, 440, 494, 523, 587, 659] },
+  // Jazz / exotic modes — the full set of "cool" tonalities
+  { id: 'locrian',        name: 'Locrian',          blurb: 'Half-dim, dark, unstable',   notes: [262, 277, 311, 349, 370, 415, 466, 523, 554, 622] },
+  { id: 'lydian-dom',     name: 'Lydian Dominant',  blurb: 'Bright + edgy (#4, b7)',     notes: [262, 294, 330, 370, 392, 440, 466, 523, 587, 659] },
+  { id: 'altered',        name: 'Altered Scale',    blurb: 'Super Locrian — jazz tension', notes: [262, 277, 311, 330, 370, 415, 466, 523, 554, 622] },
+  { id: 'bebop-dom',      name: 'Bebop Dominant',   blurb: 'Walking-bass jazz',          notes: [262, 294, 330, 349, 392, 440, 466, 494, 523, 587] },
+  { id: 'diminished-wh',  name: 'Diminished W-H',   blurb: 'Symmetric octatonic',        notes: [262, 294, 311, 349, 370, 415, 440, 494, 523, 587] },
+  { id: 'diminished-hw',  name: 'Diminished H-W',   blurb: 'Over dominant 7b9',          notes: [262, 277, 311, 330, 370, 392, 440, 466, 523, 554] },
+  { id: 'lydian-aug',     name: 'Lydian Augmented', blurb: 'Bright + futuristic (#4 #5)', notes: [262, 294, 330, 370, 415, 440, 494, 523, 587, 659] },
+  { id: 'melodic-minor',  name: 'Melodic Minor',    blurb: 'Jazz minor foundation',      notes: [262, 294, 311, 349, 392, 440, 494, 523, 587, 622] },
+  { id: 'hungarian',      name: 'Hungarian Minor',  blurb: 'Exotic gypsy (#4 + 7)',      notes: [262, 294, 311, 370, 392, 415, 494, 523, 587, 622] },
+  { id: 'double-harmonic', name: 'Double Harmonic', blurb: 'Spanish flamenco / Mid-East', notes: [262, 277, 330, 349, 392, 415, 494, 523, 554, 659] },
   // Eastern flavors
   { id: 'in-sen',         name: 'In Sen',           blurb: 'Japanese, somber',   notes: [262, 277, 349, 392, 466, 523, 554, 698, 784, 932] },
   { id: 'iwato',          name: 'Iwato',            blurb: 'Japanese, dark',     notes: [262, 277, 349, 370, 466, 523, 554, 698, 740, 932] },
@@ -403,10 +414,16 @@ export const PATTERNS = [
 
 export const DEFAULT_SOUND_ID = 'off';
 export const DEFAULT_PATTERN_ID = 'ascending';
+// Queue of up to MAX_PATTERN_QUEUE patterns the chain rotates through.
+// Each pattern plays for PATTERN_QUEUE_SECTION cells before the next
+// takes over. Empty queue → fall back to the single-pattern selection.
+export const MAX_PATTERN_QUEUE = 16;
+export const PATTERN_QUEUE_SECTION = 8;
 const STORAGE_KEY = 'seinfeld_sound_scale';
 const OCTAVE_STORAGE_KEY = 'seinfeld_sound_octave';
 const PITCH_STORAGE_KEY = 'seinfeld_sound_pitch';
 const PATTERN_STORAGE_KEY = 'seinfeld_sound_pattern';
+const PATTERN_QUEUE_STORAGE_KEY = 'seinfeld_sound_pattern_queue';
 const VALID_IDS = new Set(SCALES.map(s => s.id));
 const VALID_PATTERN_IDS = new Set(PATTERNS.map(p => p.id));
 const MIN_OCTAVE = -4;   // wider downward range so low scales can rumble
@@ -460,6 +477,44 @@ export function setSelectedPatternId(id) {
 }
 export function getCurrentPattern() {
   return PATTERNS.find(p => p.id === getSelectedPatternId()) || PATTERNS[0];
+}
+// Pattern queue: an ordered list of pattern IDs that the chain cycles
+// through. When non-empty, freqAt routes each PATTERN_QUEUE_SECTION-wide
+// stretch of cells to the next pattern in the queue (then wraps around).
+export function getPatternQueue() {
+  try {
+    const raw = localStorage.getItem(PATTERN_QUEUE_STORAGE_KEY);
+    if (!raw) return [];
+    const ids = JSON.parse(raw);
+    if (!Array.isArray(ids)) return [];
+    return ids.filter(id => VALID_PATTERN_IDS.has(id)).slice(0, MAX_PATTERN_QUEUE);
+  } catch {
+    return [];
+  }
+}
+export function setPatternQueue(ids) {
+  const clean = (Array.isArray(ids) ? ids : [])
+    .filter(id => VALID_PATTERN_IDS.has(id))
+    .slice(0, MAX_PATTERN_QUEUE);
+  localStorage.setItem(PATTERN_QUEUE_STORAGE_KEY, JSON.stringify(clean));
+  return clean;
+}
+export function addToPatternQueue(id) {
+  if (!VALID_PATTERN_IDS.has(id)) return getPatternQueue();
+  const q = getPatternQueue();
+  if (q.length >= MAX_PATTERN_QUEUE) return q;
+  q.push(id);
+  return setPatternQueue(q);
+}
+export function removeFromPatternQueue(index) {
+  const q = getPatternQueue();
+  if (index < 0 || index >= q.length) return q;
+  q.splice(index, 1);
+  return setPatternQueue(q);
+}
+export function clearPatternQueue() {
+  localStorage.removeItem(PATTERN_QUEUE_STORAGE_KEY);
+  return [];
 }
 export function getCurrentScale() {
   return SCALES.find(s => s.id === getSelectedSoundId());
@@ -550,15 +605,28 @@ function maxOctaveWrapForScale(scale) {
   _maxWrapCache.set(scale, max);
   return max;
 }
+// Picks which pattern fires for a given cell index, and the local index to
+// feed it. With an empty queue, the single pattern selection handles every
+// cell (and gets the global i so its internal cycle climb / wrap math
+// works). With a non-empty queue, the chain is sliced into
+// PATTERN_QUEUE_SECTION-wide sections; each section plays one queued
+// pattern from its start (local index 0..section-1), then the next.
+function patternForCell(i) {
+  const q = getPatternQueue();
+  if (q.length === 0) return { pattern: getCurrentPattern(), localI: i };
+  const sectionIdx = Math.floor(i / PATTERN_QUEUE_SECTION) % q.length;
+  const pattern = PATTERNS.find(p => p.id === q[sectionIdx]) || PATTERNS[0];
+  return { pattern, localI: i % PATTERN_QUEUE_SECTION };
+}
 function freqAt(scale, index) {
   const notes = scale.notes;
   const i = Math.max(0, index);
-  // Patterns remap the cell index `i` into a virtual ascending step number
-  // (e.g. ping-pong rewrites 0,1,2,3 → 0,1,2,3,2,1,0,1,...). The wrap and
-  // shift math below then treats that step as if it came from a plain
-  // ascending sequence, so octave climb still works for any pattern.
-  const pattern = getCurrentPattern();
-  const step = Math.max(0, pattern.step(i, notes.length));
+  // Patterns remap the (local) cell index into a virtual ascending step
+  // number. The wrap and shift math below then treats that step as if it
+  // came from a plain ascending sequence, so octave climb still works for
+  // any pattern regardless of whether it ran solo or as part of a queue.
+  const { pattern, localI } = patternForCell(i);
+  const step = Math.max(0, pattern.step(localI, notes.length));
   const octaveWrap = Math.min(Math.floor(step / notes.length), maxOctaveWrapForScale(scale));
   const noteInOctave = step % notes.length;
   // Combined shift: chain auto-wrap + user's octave slider + pitch slider

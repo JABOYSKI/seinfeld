@@ -1,12 +1,13 @@
-// Picker modal for chain-build sounds. Now includes a simulator at the top:
-// drag the slider to a chain length, then click any tile to hear what that
-// scale would sound like at that length (the timing matches the real
-// cascade's adaptiveStep).
+// Picker modal for chain-build sounds. The simulator at the top lets you
+// preview at any chain length; the pattern queue below it lets you stitch
+// up to MAX_PATTERN_QUEUE patterns into a sequence that the chain rotates
+// through (PATTERN_QUEUE_SECTION cells per pattern).
 import {
   SCALES, getSelectedSoundId, setSelectedSoundId, playSimulation,
   getOctaveShift, setOctaveShift, OCTAVE_RANGE,
   getPitchShift, setPitchShift, PITCH_RANGE,
-  PATTERNS, getSelectedPatternId, setSelectedPatternId,
+  PATTERNS, MAX_PATTERN_QUEUE, PATTERN_QUEUE_SECTION,
+  getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
 } from './audio.js';
 
 export function openSoundPicker(onSelected) {
@@ -24,8 +25,8 @@ export function openSoundPicker(onSelected) {
       <div class="sound-simulator">
         <label class="sim-label" for="simLength">Simulate chain length</label>
         <div class="sim-row">
-          <input type="range" id="simLength" min="2" max="60" value="8" />
-          <span class="sim-value" id="simLengthValue">8</span>
+          <input type="range" id="simLength" min="2" max="128" value="16" />
+          <span class="sim-value" id="simLengthValue">16</span>
           <button type="button" class="btn btn-primary sim-play" id="simPlay">Play</button>
         </div>
         <label class="sim-label" for="simOctave">Octave shift</label>
@@ -38,27 +39,25 @@ export function openSoundPicker(onSelected) {
           <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
           <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
         </div>
-        <label class="sim-label" for="patternTrigger">Pattern</label>
+        <label class="sim-label">
+          Pattern queue
+          <span class="queue-count" id="queueCount">0/${MAX_PATTERN_QUEUE}</span>
+          <button type="button" class="queue-clear-link" id="queueClear" title="Clear queue">Clear</button>
+        </label>
         <div class="sim-row pattern-row">
           <div class="pattern-picker-wrap">
-            <button type="button" class="pattern-picker-trigger" id="patternTrigger"
-                    aria-haspopup="listbox" aria-expanded="false">
-              <span class="pattern-trigger-name" id="patternTriggerName">${getPatternName()}</span>
-              <span class="pattern-trigger-blurb" id="patternTriggerBlurb">${getPatternBlurb()}</span>
-              <span class="pattern-trigger-caret" aria-hidden="true">▾</span>
-            </button>
+            <div class="pattern-queue-bar" id="patternQueueBar"></div>
             <div class="pattern-picker-panel" id="patternPanel" role="listbox" hidden>
               <div class="pattern-panel-header">
-                <span class="pattern-panel-title">Traversal pattern</span>
-                <span class="pattern-panel-hint">Shape shows note order in a chain</span>
+                <span class="pattern-panel-title">Add to queue</span>
+                <span class="pattern-panel-hint">Click to add — sparkline shows note order</span>
               </div>
               <div class="pattern-grid">
                 ${PATTERNS.map(p => `
                   <button type="button"
-                          class="pattern-option ${p.id === getSelectedPatternId() ? 'is-selected' : ''}"
+                          class="pattern-option"
                           data-pattern="${p.id}"
                           role="option"
-                          aria-selected="${p.id === getSelectedPatternId()}"
                           title="${p.blurb}">
                     <span class="pattern-option-name">${p.name}</span>
                     ${patternSparkline(p)}
@@ -68,7 +67,7 @@ export function openSoundPicker(onSelected) {
             </div>
           </div>
         </div>
-        <p class="sim-hint">Click any tile to hear it at these settings.</p>
+        <p class="sim-hint">Each queued pattern plays for ${PATTERN_QUEUE_SECTION} cells, then the next.</p>
       </div>
 
       <div class="picker-grid picker-grid-sound" id="soundPickerGrid">
@@ -98,10 +97,10 @@ export function openSoundPicker(onSelected) {
   const simOctaveValue = overlay.querySelector('#simOctaveValue');
   const simPitch = overlay.querySelector('#simPitch');
   const simPitchValue = overlay.querySelector('#simPitchValue');
-  const patternTrigger = overlay.querySelector('#patternTrigger');
+  const queueBar = overlay.querySelector('#patternQueueBar');
+  const queueCount = overlay.querySelector('#queueCount');
   const patternPanel = overlay.querySelector('#patternPanel');
-  const patternTriggerName = overlay.querySelector('#patternTriggerName');
-  const patternTriggerBlurb = overlay.querySelector('#patternTriggerBlurb');
+  const wrap = overlay.querySelector('.pattern-picker-wrap');
 
   simLength.addEventListener('input', () => { simValue.textContent = simLength.value; });
 
@@ -115,45 +114,124 @@ export function openSoundPicker(onSelected) {
     simPitchValue.textContent = formatSigned(v);
   });
 
+  // ----- pattern queue -----
+
   const closePatternPanel = () => {
     patternPanel.hidden = true;
-    patternTrigger.setAttribute('aria-expanded', 'false');
+    const trigger = overlay.querySelector('#patternTrigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
   };
   const openPatternPanel = () => {
     patternPanel.hidden = false;
-    patternTrigger.setAttribute('aria-expanded', 'true');
+    const trigger = overlay.querySelector('#patternTrigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'true');
   };
-  patternTrigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (patternPanel.hidden) openPatternPanel(); else closePatternPanel();
-  });
+
+  const previewSim = () => {
+    playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
+  };
+
+  const renderQueueChips = () => {
+    const q = getPatternQueue();
+    const chips = q.map((id, idx) => {
+      const p = PATTERNS.find(x => x.id === id);
+      return `
+        <span class="pattern-queue-chip" data-index="${idx}" title="${p ? p.blurb : ''}">
+          <span class="chip-num">${idx + 1}</span>
+          <span class="chip-name">${p ? p.name : 'Unknown'}</span>
+          <button type="button" class="chip-remove" data-index="${idx}" aria-label="Remove from queue" tabindex="-1">×</button>
+        </span>
+      `;
+    }).join('');
+    const isFull = q.length >= MAX_PATTERN_QUEUE;
+    const isEmpty = q.length === 0;
+    const trigger = `
+      <button type="button"
+              class="pattern-queue-add"
+              id="patternTrigger"
+              aria-haspopup="listbox"
+              aria-expanded="${patternPanel.hidden ? 'false' : 'true'}"
+              ${isFull ? 'disabled' : ''}
+              title="${isFull ? 'Queue full' : 'Add pattern to queue'}">
+        <span class="add-plus">+</span>${isEmpty ? '<span class="add-label">Add pattern</span>' : ''}
+      </button>
+    `;
+    queueBar.innerHTML = chips + trigger;
+    queueCount.textContent = `${q.length}/${MAX_PATTERN_QUEUE}`;
+    queueBar.classList.toggle('is-empty', isEmpty);
+
+    // Wire the dynamically-created chip removes
+    queueBar.querySelectorAll('.chip-remove').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.index, 10);
+        removeFromPatternQueue(idx);
+        renderQueueChips();
+        updatePanelSelection();
+        previewSim();
+      });
+    });
+    // Wire the dynamically-created + Add trigger
+    const trig = queueBar.querySelector('#patternTrigger');
+    if (trig) {
+      trig.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (trig.disabled) return;
+        if (patternPanel.hidden) openPatternPanel(); else closePatternPanel();
+      });
+    }
+  };
+
+  const updatePanelSelection = () => {
+    const queued = new Set(getPatternQueue());
+    patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
+      const inQueue = queued.has(opt.dataset.pattern);
+      opt.classList.toggle('is-selected', inQueue);
+      opt.setAttribute('aria-selected', inQueue ? 'true' : 'false');
+    });
+  };
+
+  // Initial render
+  renderQueueChips();
+  updatePanelSelection();
+
+  // Clicking a panel option ADDS to queue (and keeps the panel open so the
+  // user can rapidly build a sequence). The panel auto-closes only when
+  // the queue hits its cap.
   patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
       const id = opt.dataset.pattern;
-      setSelectedPatternId(id);
-      patternPanel.querySelectorAll('.pattern-option').forEach(o => {
-        const sel = o === opt;
-        o.classList.toggle('is-selected', sel);
-        o.setAttribute('aria-selected', sel ? 'true' : 'false');
-      });
-      patternTriggerName.textContent = getPatternName();
-      patternTriggerBlurb.textContent = getPatternBlurb();
-      closePatternPanel();
-      // Auto-preview the new pattern with the current scale + length.
-      playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
+      const before = getPatternQueue().length;
+      const after = addToPatternQueue(id).length;
+      if (after === before) return; // queue full and add rejected
+      renderQueueChips();
+      updatePanelSelection();
+      previewSim();
+      if (after >= MAX_PATTERN_QUEUE) closePatternPanel();
     });
   });
-  // Click anywhere else inside the modal closes the panel.
-  overlay.addEventListener('click', (e) => {
-    if (!patternPanel.hidden && !patternPanel.contains(e.target) && e.target !== patternTrigger && !patternTrigger.contains(e.target)) {
-      closePatternPanel();
-    }
+
+  overlay.querySelector('#queueClear').addEventListener('click', (e) => {
+    e.stopPropagation();
+    clearPatternQueue();
+    renderQueueChips();
+    updatePanelSelection();
+    previewSim();
   });
 
-  simPlay.addEventListener('click', () => {
-    playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
+  // Click anywhere outside the panel and trigger → close panel.
+  overlay.addEventListener('click', (e) => {
+    if (patternPanel.hidden) return;
+    if (patternPanel.contains(e.target)) return;
+    const trigger = overlay.querySelector('#patternTrigger');
+    if (trigger && (e.target === trigger || trigger.contains(e.target))) return;
+    closePatternPanel();
   });
+
+  // ----- simulator + scales -----
+
+  simPlay.addEventListener('click', previewSim);
 
   grid.querySelectorAll('.sound-tile').forEach(tile => {
     tile.addEventListener('click', () => {
@@ -179,18 +257,6 @@ export function openSoundPicker(onSelected) {
 function formatSigned(v) {
   if (v === 0) return '0';
   return v > 0 ? `+${v}` : `${v}`;
-}
-
-function getPatternBlurb() {
-  const id = getSelectedPatternId();
-  const p = PATTERNS.find(x => x.id === id);
-  return p ? p.blurb : '';
-}
-
-function getPatternName() {
-  const id = getSelectedPatternId();
-  const p = PATTERNS.find(x => x.id === id);
-  return p ? p.name : '';
 }
 
 // Render a compact line+dot sparkline of how `pattern` traverses a 10-note
