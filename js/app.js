@@ -166,7 +166,6 @@ function renderShell() {
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
         <button class="icon-btn ${getSelectedSoundId() !== 'off' ? 'is-active' : ''}" id="soundBtn" title="Choose chain sound">${getSelectedSoundId() === 'off' ? '🔇' : '🔊'}</button>
-        <button class="icon-btn icon-btn-symphony" id="symphonyBtn" title="Play all active chains together">🎼</button>
         <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${viewToggleIcon()}</button>
         <button class="icon-btn ${getShowWeekNumbers() ? 'is-active' : ''}" id="weekNumBtn" title="Toggle week numbers (continuous view)">#</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
@@ -187,6 +186,10 @@ function renderShell() {
         <div class="year-label" id="yearLabel">${state.currentYear}</div>
         <button class="icon-btn" id="yearNext" title="Next year">›</button>
         <div class="header-spacer"></div>
+        <button class="symphony-btn" id="symphonyBtn" type="button" title="Play every active chain together">
+          <span class="symphony-icon" aria-hidden="true">🎼</span>
+          <span class="symphony-label">Play Symphony</span>
+        </button>
         <div class="streak-chip" id="streakChip"></div>
       </div>
       <div class="calendar" id="calendar"></div>
