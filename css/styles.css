@@ -894,6 +894,15 @@ button { font: inherit; color: inherit; }
   letter-spacing: 0.02em;
   white-space: nowrap;
   line-height: 1;
+  cursor: pointer;
+  transition: box-shadow 120ms, transform 120ms;
+}
+.pattern-queue-chip:hover {
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent);
+  transform: translateY(-1px);
+}
+.pattern-queue-chip.is-editing {
+  box-shadow: 0 0 0 2px var(--accent-text), 0 0 0 4px var(--accent);
 }
 .chip-num {
   display: inline-flex;
@@ -1059,8 +1068,11 @@ button { font: inherit; color: inherit; }
   /* `position: fixed` so it can escape the dialog's vertical bounds when
      the trigger sits near the bottom of the viewport. JS recomputes top
      / left / max-height on open + resize so it lands inside the viewport
-     and flips above the trigger when there's no room below. */
+     and flips above the trigger when there's no room below.
+     box-sizing: border-box so the JS-set max-height includes padding +
+     border (otherwise the panel could spill past the viewport edge). */
   position: fixed;
+  box-sizing: border-box;
   width: 380px;
   max-width: calc(100vw - 40px);
   background: var(--bg-elev);
@@ -1105,11 +1117,11 @@ button { font: inherit; color: inherit; }
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 10px -6px -6px;
+  margin: 10px 0 0;
   padding: 8px 10px;
   background: color-mix(in srgb, var(--accent) 12%, var(--bg-elev));
-  border-top: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-light));
-  border-radius: 0 0 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-light));
+  border-radius: 8px;
   font-size: 11px;
   color: var(--text-dim);
   font-weight: 600;
@@ -1288,6 +1300,120 @@ button { font: inherit; color: inherit; }
 }
 .dialog h2 { margin: 0 0 16px; font-size: 18px; font-weight: 700; }
 .dlg-meta { color: var(--text-dim); font-size: 12px; margin: -4px 0 14px; }
+
+/* Per-chip editor: small fixed-position popover anchored near the chip.
+   Sliders for octave / pitch / tones override that single entry's values;
+   Reset drops the overrides so the entry inherits the global sliders. */
+.chip-editor {
+  position: fixed;
+  box-sizing: border-box;
+  width: 320px;
+  max-width: calc(100vw - 20px);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  z-index: 110;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.chip-editor[hidden] { display: none; }
+.chip-editor .ce-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+.chip-editor .ce-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.chip-editor .ce-meta {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip-editor .ce-close {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.chip-editor .ce-close:hover { color: var(--text); }
+.chip-editor .ce-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+}
+.chip-editor .ce-row label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.chip-editor .ce-row input[type="range"] {
+  accent-color: var(--accent);
+  width: 100%;
+}
+.chip-editor .ce-value {
+  font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: right;
+}
+.chip-editor .ce-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.chip-editor .ce-reset {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chip-editor .ce-reset:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.chip-editor .ce-done {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--accent-text);
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chip-editor .ce-done:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
 
 /* Confirm-destructive dialog (used by the un-fill-old-cell flow). */
 .dialog-confirm { max-width: 420px; }

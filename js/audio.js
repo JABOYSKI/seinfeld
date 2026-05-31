@@ -499,8 +499,14 @@ function readQueuesMap() {
 function writeQueuesMap(map) {
   localStorage.setItem(PATTERN_QUEUES_STORAGE_KEY, JSON.stringify(map));
 }
-// Normalize a queue entry into the canonical {pattern, scale} shape.
+// Normalize a queue entry into the canonical
+// {pattern, scale, octaveShift?, pitchShift?, sectionLength?} shape.
 // Accepts bare strings (legacy v1 format) as {pattern: x, scale: null}.
+// octaveShift / pitchShift / sectionLength are OPTIONAL per-entry
+// overrides — when absent the entry inherits the global slider values
+// and the default PATTERN_QUEUE_SECTION at play time.
+export const MIN_SECTION_LENGTH = 1;
+export const MAX_SECTION_LENGTH = 64;
 function normalizeQueueEntry(item) {
   if (typeof item === 'string') {
     return VALID_PATTERN_IDS.has(item) ? { pattern: item, scale: null } : null;
@@ -508,7 +514,17 @@ function normalizeQueueEntry(item) {
   if (!item || typeof item !== 'object') return null;
   if (!VALID_PATTERN_IDS.has(item.pattern)) return null;
   const scale = (item.scale && VALID_IDS.has(item.scale)) ? item.scale : null;
-  return { pattern: item.pattern, scale };
+  const out = { pattern: item.pattern, scale };
+  if (typeof item.octaveShift === 'number' && item.octaveShift >= MIN_OCTAVE && item.octaveShift <= MAX_OCTAVE) {
+    out.octaveShift = Math.round(item.octaveShift);
+  }
+  if (typeof item.pitchShift === 'number' && item.pitchShift >= MIN_PITCH && item.pitchShift <= MAX_PITCH) {
+    out.pitchShift = Math.round(item.pitchShift);
+  }
+  if (typeof item.sectionLength === 'number' && item.sectionLength >= MIN_SECTION_LENGTH && item.sectionLength <= MAX_SECTION_LENGTH) {
+    out.sectionLength = Math.round(item.sectionLength);
+  }
+  return out;
 }
 export function getPatternQueue(habitId) {
   if (!habitId) return [];
@@ -541,6 +557,21 @@ export function removeFromPatternQueue(habitId, index) {
   const q = getPatternQueue(habitId);
   if (index < 0 || index >= q.length) return q;
   q.splice(index, 1);
+  return setPatternQueue(habitId, q);
+}
+// Partial update of one entry: merge `updates` into the existing entry,
+// then re-normalize. Pass an undefined value to drop an override (revert
+// to the global default at play time).
+export function updateQueueEntry(habitId, index, updates) {
+  const q = getPatternQueue(habitId);
+  if (index < 0 || index >= q.length) return q;
+  const merged = { ...q[index], ...updates };
+  for (const k of Object.keys(updates)) {
+    if (updates[k] === undefined || updates[k] === null) delete merged[k];
+  }
+  const next = normalizeQueueEntry(merged);
+  if (!next) return q;
+  q[index] = next;
   return setPatternQueue(habitId, q);
 }
 export function clearPatternQueue(habitId) {
@@ -639,41 +670,58 @@ function maxOctaveWrapForScale(scale) {
   _maxWrapCache.set(scale, max);
   return max;
 }
-// Resolves (scale, pattern, localI) for a cell index given a habit context.
-// Empty queue OR no habit context → use the global selection (current
-// scale, current single pattern), and feed the pattern the full global
-// index so its internal cycle climb / wrap math still works. With a
-// non-empty queue, the chain is sliced into PATTERN_QUEUE_SECTION-wide
-// sections; each section uses the next queue entry's pattern AND scale,
-// fed a fresh localI starting at 0.
-function audioContextForCell(i, habitId) {
-  const q = habitId ? getPatternQueue(habitId) : [];
-  if (q.length === 0) {
-    return { scale: getCurrentScale(), pattern: getCurrentPattern(), localI: i };
-  }
-  const sectionIdx = Math.floor(i / PATTERN_QUEUE_SECTION) % q.length;
-  const entry = q[sectionIdx];
+// Resolves (scale, pattern, localI, octaveShift, pitchShift) for a cell
+// index given a habit context. Empty queue OR no habit context → uses
+// the global selection. With a non-empty queue, walks through entries
+// summing their (per-entry-or-default) sectionLengths and returns the
+// entry that covers cell `i`. Per-entry octave / pitch overrides fall
+// back to the global slider values when the entry doesn't set them.
+function defaultAudioContext(i) {
+  return {
+    scale: getCurrentScale(),
+    pattern: getCurrentPattern(),
+    localI: i,
+    octaveShift: getOctaveShift(),
+    pitchShift: getPitchShift(),
+  };
+}
+function resolveEntry(entry, localI) {
   const pattern = PATTERNS.find(p => p.id === entry.pattern) || PATTERNS[0];
   const scale = (entry.scale ? SCALES.find(s => s.id === entry.scale) : null) || getCurrentScale();
-  return { scale, pattern, localI: i % PATTERN_QUEUE_SECTION };
+  const octaveShift = (typeof entry.octaveShift === 'number') ? entry.octaveShift : getOctaveShift();
+  const pitchShift = (typeof entry.pitchShift === 'number') ? entry.pitchShift : getPitchShift();
+  return { scale, pattern, localI, octaveShift, pitchShift };
 }
-// Turns a (scale, pattern, localI) into a concrete frequency, applying the
-// auto-octave wrap + user's octave + pitch shifters.
-function freqAtWith(scale, pattern, localI) {
+function audioContextForCell(i, habitId) {
+  const q = habitId ? getPatternQueue(habitId) : [];
+  if (q.length === 0) return defaultAudioContext(i);
+  const totalCells = q.reduce((sum, e) => sum + (e.sectionLength || PATTERN_QUEUE_SECTION), 0);
+  if (totalCells === 0) return defaultAudioContext(i);
+  let pos = ((i % totalCells) + totalCells) % totalCells;
+  for (const entry of q) {
+    const len = entry.sectionLength || PATTERN_QUEUE_SECTION;
+    if (pos < len) return resolveEntry(entry, pos);
+    pos -= len;
+  }
+  return defaultAudioContext(i); // unreachable in practice
+}
+// Turns (scale, pattern, localI, shifts) into a concrete frequency,
+// applying the auto-octave wrap + per-entry (or global) octave + pitch.
+function freqAtWith(scale, pattern, localI, octaveShift = 0, pitchShift = 0) {
   const notes = scale.notes;
   const step = Math.max(0, pattern.step(localI, notes.length));
   const octaveWrap = Math.min(Math.floor(step / notes.length), maxOctaveWrapForScale(scale));
   const noteInOctave = step % notes.length;
-  const totalOctaves = octaveWrap + getOctaveShift() + getPitchShift() / 12;
+  const totalOctaves = octaveWrap + octaveShift + pitchShift / 12;
   return notes[noteInOctave] * Math.pow(2, totalOctaves);
 }
 export function playNoteAt(index, opts = {}) {
   const i = Math.max(0, index);
   const { gain = 0.4 + Math.min(i, 20) * 0.008, habitId = null } = opts;
-  const { scale, pattern, localI } = audioContextForCell(i, habitId);
+  const { scale, pattern, localI, octaveShift, pitchShift } = audioContextForCell(i, habitId);
   if (!scale || !scale.notes) return;
   const synth = scale.synth || {};
-  playMalletNote(freqAtWith(scale, pattern, localI), { ...synth, gain });
+  playMalletNote(freqAtWith(scale, pattern, localI, octaveShift, pitchShift), { ...synth, gain });
 }
 
 // All cells pulse simultaneously — play a brief stacked-note chord. With a
@@ -682,10 +730,10 @@ export function playNoteAt(index, opts = {}) {
 export function playChord(count, habitId = null) {
   const n = Math.max(1, count);
   for (let i = 0; i < n; i++) {
-    const { scale, pattern, localI } = audioContextForCell(i, habitId);
+    const { scale, pattern, localI, octaveShift, pitchShift } = audioContextForCell(i, habitId);
     if (!scale || !scale.notes) continue;
     const synth = scale.synth || {};
-    playMalletNote(freqAtWith(scale, pattern, localI), {
+    playMalletNote(freqAtWith(scale, pattern, localI, octaveShift, pitchShift), {
       ...synth, gain: 0.42 / Math.sqrt(n),
     });
   }
@@ -694,16 +742,17 @@ export function playChord(count, habitId = null) {
 // Single bright impact note (for shockwave / fireworks / starburst etc.)
 export function playBurst(habitId = null) {
   const focus = 5; // bright-ish position in the queue/pattern
-  const { scale, pattern, localI } = audioContextForCell(focus, habitId);
+  const { scale, pattern, localI, octaveShift, pitchShift } = audioContextForCell(focus, habitId);
   if (!scale || !scale.notes) return;
   const synth = scale.synth || {};
   const safeLocal = Math.min(localI, scale.notes.length - 1);
-  playMalletNote(freqAtWith(scale, pattern, safeLocal), { ...synth, gain: 0.65 });
+  playMalletNote(freqAtWith(scale, pattern, safeLocal, octaveShift, pitchShift), { ...synth, gain: 0.65 });
 }
 
 // Plays a single (pattern, scale) combo in isolation — used by the sound
 // picker so clicking a pattern in the panel previews that pattern with
 // the currently selected scale, without touching the habit's queue at all.
+// Uses the global octave + pitch shifts at preview time.
 export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SECTION) {
   const pattern = PATTERNS.find(p => p.id === patternId);
   const scale = SCALES.find(s => s.id === scaleId);
@@ -714,9 +763,11 @@ export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SE
   const stepMs = n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n));
   const synth = scale.synth || {};
   const startSec = c.currentTime;
+  const oct = getOctaveShift();
+  const pit = getPitchShift();
   for (let i = 0; i < n; i++) {
     const gain = 0.4 + Math.min(i, 20) * 0.008;
-    playMalletNote(freqAtWith(scale, pattern, i), {
+    playMalletNote(freqAtWith(scale, pattern, i, oct, pit), {
       ...synth, gain,
       when: (startSec - c.currentTime) + (i * stepMs) / 1000,
     });
@@ -734,11 +785,11 @@ export function playSimulation(length, habitId = null) {
   const stepMs = n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n));
   const startSec = c.currentTime;
   for (let i = 0; i < n; i++) {
-    const { scale, pattern, localI } = audioContextForCell(i, habitId);
+    const { scale, pattern, localI, octaveShift, pitchShift } = audioContextForCell(i, habitId);
     if (!scale || !scale.notes) continue;
     const synth = scale.synth || {};
     const gain = 0.4 + Math.min(i, 20) * 0.008;
-    playMalletNote(freqAtWith(scale, pattern, localI), {
+    playMalletNote(freqAtWith(scale, pattern, localI, octaveShift, pitchShift), {
       ...synth,
       gain,
       when: (startSec - c.currentTime) + (i * stepMs) / 1000,

@@ -16,8 +16,9 @@ import {
   getOctaveShift, setOctaveShift, OCTAVE_RANGE,
   getPitchShift, setPitchShift, PITCH_RANGE,
   PATTERNS, MAX_PATTERN_QUEUE, PATTERN_QUEUE_SECTION,
+  MIN_SECTION_LENGTH, MAX_SECTION_LENGTH,
   getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
-  playPatternPreview,
+  updateQueueEntry, playPatternPreview,
 } from './audio.js';
 
 export function openSoundPicker(habits, initialHabitId, onSelected) {
@@ -107,6 +108,33 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
         </p>
       </div>
 
+      <div class="chip-editor" id="chipEditor" hidden role="dialog" aria-label="Edit queue step">
+        <div class="ce-head">
+          <span class="ce-title">Step <span id="ceStepNum">1</span></span>
+          <span class="ce-meta" id="ceMeta">Pattern · Scale</span>
+          <button type="button" class="ce-close" id="ceClose" aria-label="Close">×</button>
+        </div>
+        <div class="ce-row">
+          <label for="ceOctave">Octave shift</label>
+          <input type="range" id="ceOctave" min="${OCTAVE_RANGE.min}" max="${OCTAVE_RANGE.max}" step="1" value="0" />
+          <span class="ce-value" id="ceOctaveValue">0</span>
+        </div>
+        <div class="ce-row">
+          <label for="cePitch">Pitch (semitones)</label>
+          <input type="range" id="cePitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="0" />
+          <span class="ce-value" id="cePitchValue">0</span>
+        </div>
+        <div class="ce-row">
+          <label for="ceTones">Tones (cells)</label>
+          <input type="range" id="ceTones" min="${MIN_SECTION_LENGTH}" max="${MAX_SECTION_LENGTH}" step="1" value="${PATTERN_QUEUE_SECTION}" />
+          <span class="ce-value" id="ceTonesValue">${PATTERN_QUEUE_SECTION}</span>
+        </div>
+        <div class="ce-actions">
+          <button type="button" class="ce-reset" id="ceReset">Reset to defaults</button>
+          <button type="button" class="ce-done btn-primary" id="ceDone">Done</button>
+        </div>
+      </div>
+
       <div class="picker-grid picker-grid-sound" id="soundPickerGrid">
         ${SCALES.map(s => `
           <button type="button"
@@ -153,11 +181,12 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
 
   // ----- pattern queue (per-habit) -----
 
-  // Positions the (now fixed-positioned) pattern panel relative to the
-  // trigger button each time it opens (and on viewport resize). Picks
-  // below-trigger when there's room, otherwise flips above; constrains
-  // max-height so the panel always fits the viewport even if the trigger
-  // is near the bottom of the dialog.
+  // Positions the (fixed) pattern panel relative to the trigger each time
+  // it opens and on viewport resize. Opens in the direction with more
+  // available space and constrains max-height to EXACTLY that space (no
+  // floor) so the panel can never extend past the viewport edge even when
+  // both above/below are tight. The confirm bar / Add button stay pinned
+  // because the inner grid scrolls within the panel.
   const positionPanel = () => {
     if (patternPanel.hidden) return;
     const trigger = overlay.querySelector('#patternTrigger');
@@ -166,23 +195,23 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     const vh = window.innerHeight;
     const vw = window.innerWidth;
     const margin = 10;
+    const gap = 6;
     const panelW = Math.min(380, vw - 2 * margin);
     patternPanel.style.width = `${panelW}px`;
     let left = r.left;
     if (left + panelW + margin > vw) left = vw - panelW - margin;
     if (left < margin) left = margin;
     patternPanel.style.left = `${left}px`;
-    const spaceBelow = vh - r.bottom - margin;
-    const spaceAbove = r.top - margin;
-    const preferredH = 480;
-    if (spaceBelow >= preferredH || spaceBelow >= spaceAbove) {
-      patternPanel.style.top = `${r.bottom + 6}px`;
+    const spaceBelow = Math.max(0, vh - r.bottom - margin - gap);
+    const spaceAbove = Math.max(0, r.top - margin - gap);
+    if (spaceBelow >= spaceAbove) {
+      patternPanel.style.top = `${r.bottom + gap}px`;
       patternPanel.style.bottom = 'auto';
-      patternPanel.style.maxHeight = `${Math.max(180, spaceBelow)}px`;
+      patternPanel.style.maxHeight = `${spaceBelow}px`;
     } else {
       patternPanel.style.top = 'auto';
-      patternPanel.style.bottom = `${vh - r.top + 6}px`;
-      patternPanel.style.maxHeight = `${Math.max(180, spaceAbove)}px`;
+      patternPanel.style.bottom = `${vh - r.top + gap}px`;
+      patternPanel.style.maxHeight = `${spaceAbove}px`;
     }
   };
 
@@ -201,7 +230,12 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     positionPanel();
   };
 
-  const onResize = () => positionPanel();
+  const onResize = () => {
+    positionPanel();
+    if (!chipEditor || chipEditor.hidden) return;
+    const chip = queueBar.querySelector(`.pattern-queue-chip[data-index="${editingChipIndex}"]`);
+    positionChipEditor(chip ? chip.getBoundingClientRect() : null);
+  };
   window.addEventListener('resize', onResize);
 
   const previewSim = () => {
@@ -282,8 +316,18 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
         if (!editingHabitId) return;
         const idx = parseInt(btn.dataset.index, 10);
         removeFromPatternQueue(editingHabitId, idx);
+        closeChipEditor();
         renderQueueChips();
         previewSim();
+      });
+    });
+    // Clicking the chip body (not the × button) opens the per-step editor.
+    queueBar.querySelectorAll('.pattern-queue-chip').forEach(chip => {
+      chip.addEventListener('click', (e) => {
+        if (e.target.closest('.chip-remove')) return;
+        e.stopPropagation();
+        if (!editingHabitId) return;
+        openChipEditor(parseInt(chip.dataset.index, 10), chip);
       });
     });
     const trig = queueBar.querySelector('#patternTrigger');
@@ -405,6 +449,131 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     const trigger = overlay.querySelector('#patternTrigger');
     if (trigger && (e.target === trigger || trigger.contains(e.target))) return;
     closePatternPanel();
+  });
+
+  // ----- per-chip editor -----
+  //
+  // Click a queue chip → opens a popover anchored near the chip. Sliders
+  // override that single entry's octave shift, pitch shift, and section
+  // length (how many cells this entry plays for); a Reset button drops
+  // the per-entry overrides so the entry falls back to the global
+  // sliders. Changes auto-save + auto-preview the queue.
+  const chipEditor = overlay.querySelector('#chipEditor');
+  const ceStepNum = overlay.querySelector('#ceStepNum');
+  const ceMeta = overlay.querySelector('#ceMeta');
+  const ceOctave = overlay.querySelector('#ceOctave');
+  const ceOctaveValue = overlay.querySelector('#ceOctaveValue');
+  const cePitch = overlay.querySelector('#cePitch');
+  const cePitchValue = overlay.querySelector('#cePitchValue');
+  const ceTones = overlay.querySelector('#ceTones');
+  const ceTonesValue = overlay.querySelector('#ceTonesValue');
+  const ceReset = overlay.querySelector('#ceReset');
+  const ceDone = overlay.querySelector('#ceDone');
+  const ceClose = overlay.querySelector('#ceClose');
+  let editingChipIndex = -1;
+
+  const positionChipEditor = (anchorRect) => {
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    const margin = 10;
+    const gap = 6;
+    const w = Math.min(320, vw - 2 * margin);
+    chipEditor.style.width = `${w}px`;
+    let left = anchorRect ? anchorRect.left : (vw - w) / 2;
+    if (left + w + margin > vw) left = vw - w - margin;
+    if (left < margin) left = margin;
+    chipEditor.style.left = `${left}px`;
+    const refTop = anchorRect ? anchorRect.bottom : vh / 2;
+    const refBottom = anchorRect ? anchorRect.top : vh / 2;
+    const spaceBelow = Math.max(0, vh - refTop - margin - gap);
+    const spaceAbove = Math.max(0, refBottom - margin - gap);
+    if (spaceBelow >= spaceAbove) {
+      chipEditor.style.top = `${refTop + gap}px`;
+      chipEditor.style.bottom = 'auto';
+      chipEditor.style.maxHeight = `${spaceBelow}px`;
+    } else {
+      chipEditor.style.top = 'auto';
+      chipEditor.style.bottom = `${vh - refBottom + gap}px`;
+      chipEditor.style.maxHeight = `${spaceAbove}px`;
+    }
+  };
+
+  const openChipEditor = (idx, anchorEl) => {
+    if (!editingHabitId) return;
+    const q = getPatternQueue(editingHabitId);
+    if (idx < 0 || idx >= q.length) return;
+    const entry = q[idx];
+    editingChipIndex = idx;
+    const p = PATTERNS.find(x => x.id === entry.pattern);
+    const s = entry.scale ? SCALES.find(x => x.id === entry.scale) : null;
+    ceStepNum.textContent = String(idx + 1);
+    ceMeta.textContent = `${p ? p.name : '?'} · ${s ? s.name : 'default'}`;
+    ceOctave.value = (typeof entry.octaveShift === 'number') ? entry.octaveShift : getOctaveShift();
+    cePitch.value = (typeof entry.pitchShift === 'number') ? entry.pitchShift : getPitchShift();
+    ceTones.value = entry.sectionLength || PATTERN_QUEUE_SECTION;
+    ceOctaveValue.textContent = formatSigned(parseInt(ceOctave.value, 10));
+    cePitchValue.textContent = formatSigned(parseInt(cePitch.value, 10));
+    ceTonesValue.textContent = ceTones.value;
+    chipEditor.hidden = false;
+    positionChipEditor(anchorEl ? anchorEl.getBoundingClientRect() : null);
+    // Visually mark the chip being edited.
+    queueBar.querySelectorAll('.pattern-queue-chip').forEach(c => {
+      c.classList.toggle('is-editing', parseInt(c.dataset.index, 10) === idx);
+    });
+  };
+  const closeChipEditor = () => {
+    chipEditor.hidden = true;
+    editingChipIndex = -1;
+    queueBar.querySelectorAll('.pattern-queue-chip').forEach(c => c.classList.remove('is-editing'));
+  };
+
+  const applyChipChange = (updates) => {
+    if (editingChipIndex < 0 || !editingHabitId) return;
+    updateQueueEntry(editingHabitId, editingChipIndex, updates);
+    renderQueueChips();
+    // re-mark editing chip (renderQueueChips wipes classes)
+    const chip = queueBar.querySelector(`.pattern-queue-chip[data-index="${editingChipIndex}"]`);
+    if (chip) chip.classList.add('is-editing');
+    previewSim();
+  };
+
+  ceOctave.addEventListener('input', () => {
+    const v = parseInt(ceOctave.value, 10);
+    ceOctaveValue.textContent = formatSigned(v);
+    applyChipChange({ octaveShift: v });
+  });
+  cePitch.addEventListener('input', () => {
+    const v = parseInt(cePitch.value, 10);
+    cePitchValue.textContent = formatSigned(v);
+    applyChipChange({ pitchShift: v });
+  });
+  ceTones.addEventListener('input', () => {
+    const v = parseInt(ceTones.value, 10);
+    ceTonesValue.textContent = String(v);
+    applyChipChange({ sectionLength: v });
+  });
+  ceReset.addEventListener('click', (e) => {
+    e.stopPropagation();
+    applyChipChange({ octaveShift: undefined, pitchShift: undefined, sectionLength: undefined });
+    // Reflect the cleared (global-default) values back into the sliders.
+    ceOctave.value = getOctaveShift();
+    cePitch.value = getPitchShift();
+    ceTones.value = PATTERN_QUEUE_SECTION;
+    ceOctaveValue.textContent = formatSigned(parseInt(ceOctave.value, 10));
+    cePitchValue.textContent = formatSigned(parseInt(cePitch.value, 10));
+    ceTonesValue.textContent = ceTones.value;
+  });
+  ceDone.addEventListener('click', (e) => { e.stopPropagation(); closeChipEditor(); });
+  ceClose.addEventListener('click', (e) => { e.stopPropagation(); closeChipEditor(); });
+
+  // Click outside chip editor closes it (but clicks inside the editor or
+  // on another chip don't — clicking another chip will reopen for that
+  // chip via the chip click handler).
+  overlay.addEventListener('click', (e) => {
+    if (chipEditor.hidden) return;
+    if (chipEditor.contains(e.target)) return;
+    if (e.target.closest('.pattern-queue-chip')) return;
+    closeChipEditor();
   });
 
   // ----- simulator + scales -----
