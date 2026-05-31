@@ -1056,9 +1056,11 @@ button { font: inherit; color: inherit; }
   color: var(--text);
 }
 .pattern-picker-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  /* `position: fixed` so it can escape the dialog's vertical bounds when
+     the trigger sits near the bottom of the viewport. JS recomputes top
+     / left / max-height on open + resize so it lands inside the viewport
+     and flips above the trigger when there's no room below. */
+  position: fixed;
   width: 380px;
   max-width: calc(100vw - 40px);
   background: var(--bg-elev);
@@ -1067,7 +1069,16 @@ button { font: inherit; color: inherit; }
   z-index: 100;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
   padding: 12px;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+}
+.pattern-picker-panel > .pattern-panel-header,
+.pattern-picker-panel > .pattern-confirm-bar { flex-shrink: 0; }
+.pattern-picker-panel > .pattern-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 /* `display: flex/grid` above otherwise wins over the user-agent `[hidden]`
    rule and the panel becomes impossible to close. */

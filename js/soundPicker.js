@@ -153,6 +153,39 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
 
   // ----- pattern queue (per-habit) -----
 
+  // Positions the (now fixed-positioned) pattern panel relative to the
+  // trigger button each time it opens (and on viewport resize). Picks
+  // below-trigger when there's room, otherwise flips above; constrains
+  // max-height so the panel always fits the viewport even if the trigger
+  // is near the bottom of the dialog.
+  const positionPanel = () => {
+    if (patternPanel.hidden) return;
+    const trigger = overlay.querySelector('#patternTrigger');
+    if (!trigger) return;
+    const r = trigger.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    const margin = 10;
+    const panelW = Math.min(380, vw - 2 * margin);
+    patternPanel.style.width = `${panelW}px`;
+    let left = r.left;
+    if (left + panelW + margin > vw) left = vw - panelW - margin;
+    if (left < margin) left = margin;
+    patternPanel.style.left = `${left}px`;
+    const spaceBelow = vh - r.bottom - margin;
+    const spaceAbove = r.top - margin;
+    const preferredH = 480;
+    if (spaceBelow >= preferredH || spaceBelow >= spaceAbove) {
+      patternPanel.style.top = `${r.bottom + 6}px`;
+      patternPanel.style.bottom = 'auto';
+      patternPanel.style.maxHeight = `${Math.max(180, spaceBelow)}px`;
+    } else {
+      patternPanel.style.top = 'auto';
+      patternPanel.style.bottom = `${vh - r.top + 6}px`;
+      patternPanel.style.maxHeight = `${Math.max(180, spaceAbove)}px`;
+    }
+  };
+
   const closePatternPanel = () => {
     patternPanel.hidden = true;
     const trigger = overlay.querySelector('#patternTrigger');
@@ -165,7 +198,11 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     patternPanel.hidden = false;
     const trigger = overlay.querySelector('#patternTrigger');
     if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    positionPanel();
   };
+
+  const onResize = () => positionPanel();
+  window.addEventListener('resize', onResize);
 
   const previewSim = () => {
     playSimulation(parseInt(simLength.value, 10), editingHabitId);
@@ -390,7 +427,10 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     });
   });
 
-  const close = () => overlay.remove();
+  const close = () => {
+    window.removeEventListener('resize', onResize);
+    overlay.remove();
+  };
   overlay.querySelector('#soundPickerClose').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
