@@ -351,58 +351,54 @@ export const PATTERNS = [
       return cycle * n + within;
     } },
 
-  // ----- 6 phonk / plugg / rage flavored patterns -----
-  // Hypnotic looping motifs in the spirit of whiteboyops-tagged
-  // hyperphonk, Bjorn Bozelli / "Your Stepdad" plugg-rage hybrids, drift
-  // phonk leads, and dark Memphis sample loops. Vibe is REPETITIVE and
-  // TRANCE-LIKE rather than the narrative arc-and-resolve of drill: each
-  // motif loops tightly and drifts up only one step every several phrases
-  // so even a 100-cell chain stays in roughly the same register.
+  // ----- 6 melodic-loop patterns (whiteboyops / plugg-rage aesthetic) -----
+  // Built like actual song hooks — 6 to 12-note phrases with real melodic
+  // shape and identity, rather than abstract motion. The loop is the
+  // point: each phrase repeats long enough to read as a recognizable
+  // melody, drifting up only every couple of phrases so the hook stays
+  // identifiable instead of marching off into the stratosphere.
   //
-  // Pairs best:
-  //   • Plugg / Trance / Glide → bright triangle scales (crystal-cave,
-  //     lullaby-box, celesta, music-box) for the plugg sparkle
-  //   • Rage / Phonk Crawl / Memphis → dark scales (haunted, dragons-lair,
-  //     midnight, antimatter, hirajoshi, iwato) for the Memphis menace
-  //   • Whole-tone, gamelan, and harmonic-minor work eerily well across
-  //     the board
+  // These read very differently depending on scale:
+  //   • Bright scales (lullaby-box, crystal-cave, music-box, celesta,
+  //     maj-pent) → plugg sparkle, "Your Stepdad" / Bjorn Bozelli leads
+  //   • Dark scales (harmonic-minor, phrygian-dom, haunted, dragons-lair,
+  //     hirajoshi, iwato) → menacing hyperphonk / rage lead
 
-  // TRANCE LOOP — tight 4-note plugg arpeggio (low-high-mid-top) that
-  // hammers without resolving. The hypnosis comes from how slowly it
-  // drifts: 16 cells before it nudges up one step.
-  { id: 'trance-loop',   name: 'Trance Loop',   blurb: 'Hypnotic plugg arpeggio',
-    step: (i) => Math.floor(i / 16) + [0, 4, 2, 7][i % 4] },
+  // STEPDAD — the defining bouncy mid-to-high lead phrase. Bounces around
+  // the upper register then drops to a low anchor and back. Reads as a
+  // memorable hook on the first listen.
+  { id: 'stepdad',   name: 'Stepdad',   blurb: 'Bouncy 8-note plugg hook',
+    step: (i) => Math.floor(i / 16) + [4, 7, 4, 9, 7, 4, 2, 4][i % 8] },
 
-  // PLUGG BOUNCE — 6-note bouncy phrase that sits in the middle of the
-  // register and rocks. The asymmetric length (6, not 4 or 8) keeps the
-  // ear from locking onto a beat-bar, which is the plugg signature.
-  { id: 'plugg-bounce',  name: 'Plugg Bounce',  blurb: 'Bouncy 6-note plugg lick',
-    step: (i) => Math.floor(i / 12) + [4, 7, 5, 4, 2, 4][i % 6] },
+  // SLINGSHOT — interlocking ascending fifths. Each pair leaps up a fifth
+  // and the pairs themselves climb by step, giving an aggressive, taut,
+  // accelerating-rope-pull feel.
+  { id: 'slingshot', name: 'Slingshot', blurb: 'Interlocking ascending fifths',
+    step: (i) => Math.floor(i / 24) + [0, 5, 1, 6, 2, 7, 3, 8][i % 8] },
 
-  // RAGE LEAD — root → octave-up → mid → octave-mid. Wide vertical leaps
-  // give the chaotic-aggressive rage feel (Playboi Carti / Opium / hyper-
-  // rage). Reads as "yelling melody" because of the constant register
-  // jumping.
-  { id: 'rage-lead',     name: 'Rage Lead',     blurb: 'Aggressive octave-leap lead',
-    step: (i, n) => Math.floor(i / 8) + [0, n, 4, n + 4][i % 4] },
+  // MIRAGE — wavy ascending line that doubles back on itself: up-2, back-2,
+  // up-3, back-2, up-4, back-2. Reads like a melody trying to climb but
+  // pulled back, then breaking through.
+  { id: 'mirage',    name: 'Mirage',    blurb: 'Climbing with mirror backsteps',
+    step: (i) => Math.floor(i / 16) + [0, 2, 4, 2, 5, 7, 5, 9][i % 8] },
 
-  // PHONK CRAWL — slow 4-step descent that just keeps falling. Dark
-  // Memphis-style loop: hi → mid → lo → root, repeat. The descending
-  // motion is the menace.
-  { id: 'phonk-crawl',   name: 'Phonk Crawl',   blurb: 'Dark Memphis descent',
-    step: (i) => Math.floor(i / 16) + [3, 2, 1, 0][i % 4] },
+  // FREEFALL — climbs to the top of the second octave then plunges all
+  // the way back to the floor in one drop. The vertical asymmetry is the
+  // signature: slow rise, instant fall.
+  { id: 'freefall',  name: 'Freefall',  blurb: 'Slow climb, sudden plunge',
+    step: (i) => Math.floor(i / 16) + [0, 2, 4, 7, 9, 12, 4, 0][i % 8] },
 
-  // GLIDE WAVE — smooth 8-note undulation that rises and falls like a
-  // drift-phonk lead bending through a turn. No sharp edges; pure
-  // sinusoidal melodic motion.
-  { id: 'glide-wave',    name: 'Glide Wave',    blurb: 'Drift-phonk undulation',
-    step: (i) => Math.floor(i / 16) + [0, 1, 3, 4, 5, 4, 3, 1][i % 8] },
+  // PHANTOM — root-fifth-third broken chord that jumps an octave on the
+  // 4th note, then returns. Spinning, hovering quality — sounds like a
+  // suspended chord turning in mid-air.
+  { id: 'phantom',   name: 'Phantom',   blurb: 'Spinning octave-leap arpeggio',
+    step: (i) => Math.floor(i / 12) + [0, 7, 4, 11, 7, 4][i % 6] },
 
-  // MEMPHIS DRONE — almost entirely root, with two flicks per 8-note
-  // phrase. The sparseness is the point: that ominous "same note over
-  // and over with a ghost answering" Memphis sample loop feel.
-  { id: 'memphis-drone', name: 'Memphis Drone', blurb: 'Sparse droning Memphis pulse',
-    step: (i) => Math.floor(i / 32) + [0, 0, 5, 0, 0, 0, 3, 0][i % 8] },
+  // DRIFT — 12-note rise-and-fall arc, smooth and elegant. Sounds like a
+  // melodic riser that crests in the upper register and slides back down
+  // through the chord tones — drift-phonk lead bending through a corner.
+  { id: 'drift',     name: 'Drift',     blurb: 'Elegant 12-note rise-and-fall arc',
+    step: (i) => Math.floor(i / 24) + [0, 2, 4, 5, 7, 9, 11, 9, 7, 5, 4, 2][i % 12] },
 ];
 
 export const DEFAULT_SOUND_ID = 'off';
