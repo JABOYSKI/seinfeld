@@ -777,13 +777,31 @@ button { font: inherit; color: inherit; }
      bounding box, so nudge it a hair right so it looks centered. */
   margin-left: 1px;
 }
-.symphony-btn.is-firing {
-  animation: symphonyPulse 700ms ease-out 2;
+/* One quick scale + ring per chain pulse. JS removes + re-adds the class
+   on every principal note (with a reflow in between) so this fires anew
+   for each beat — fast chains pulse fast, slow chains pulse slow, both
+   stay locked to the cell pulse and audio note. */
+.symphony-btn.beat {
+  animation: symphonyBeat 140ms ease-out;
 }
-@keyframes symphonyPulse {
-  0%   { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); }
-  50%  { transform: scale(1.1);  box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent); }
-  100% { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+@keyframes symphonyBeat {
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 3px 12px color-mix(in srgb, var(--accent) 30%, transparent),
+      0 0 0 0    color-mix(in srgb, var(--accent) 65%, transparent);
+  }
+  50% {
+    transform: scale(1.12);
+    box-shadow:
+      0 6px 18px color-mix(in srgb, var(--accent) 55%, transparent),
+      0 0 0 10px color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 3px 12px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
 }
 
 /* Sound picker: compact tiles in a 3-col grid (2 on narrow screens). With

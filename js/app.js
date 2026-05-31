@@ -457,14 +457,25 @@ async function ensureAllCompletionsLoaded() {
 // of a wall-of-sound chord, and so the visual pulses don't all collide on
 // the same anchor cell in the same frame.
 const SYMPHONY_STAGGER_MS = 70;
+// Mirrors the per-step cascade rate used by chainAnimations.js's runSequence
+// (default 65 ms, compressed via adaptiveStep for very long chains). We
+// recompute it here so the button's beat lands on the same setTimeout cycles
+// as the visual cell pulse and the synced audio note — true sync, not an
+// independent approximation.
+const SYMPHONY_BASE_STEP_MS = 65;
+const SYMPHONY_FINAL_PULSE_MS = 460;
+function symphonyStepFor(cellCount) {
+  return cellCount <= 30
+    ? SYMPHONY_BASE_STEP_MS
+    : Math.max(4, Math.floor(30 * SYMPHONY_BASE_STEP_MS / cellCount));
+}
+
 async function playSymphony(btn) {
   if (!state.habits.length) { toast('No habits yet — create one first.', 'info'); return; }
-  if (btn) btn.classList.add('is-firing');
   try {
     await ensureAllCompletionsLoaded();
   } catch (e) {
     toast(`Couldn't load chains: ${e.message}`, 'error');
-    if (btn) btn.classList.remove('is-firing');
     return;
   }
 
@@ -483,21 +494,51 @@ async function playSymphony(btn) {
 
   if (playable.length === 0) {
     toast('No active chains — fill in some days first.', 'info');
-    if (btn) btn.classList.remove('is-firing');
     return;
   }
 
   // Sort longest-first so the biggest cascade leads and the shorter chains
   // layer in beneath it — feels like the principal voice plus accompaniment.
+  // Also: the button's beat tracks this principal (the longest) cadence.
   playable.sort((a, b) => b.streak - a.streak);
-  for (let i = 0; i < playable.length; i++) {
-    const { habit, streak, anchor, set } = playable[i];
+
+  const withTiming = playable.map((p, i) => {
+    const stepMs = symphonyStepFor(p.streak);
+    return {
+      ...p,
+      cells: p.streak,
+      stepMs,
+      startAt: i * SYMPHONY_STAGGER_MS,
+      dur: (p.streak - 1) * stepMs + SYMPHONY_FINAL_PULSE_MS,
+    };
+  });
+
+  // Kick the chains
+  for (const p of withTiming) {
     setTimeout(() => {
-      playChainAnimationDirect(els.calendar, streak, habit, anchor, set);
-    }, i * SYMPHONY_STAGGER_MS);
+      playChainAnimationDirect(els.calendar, p.cells, p.habit, p.anchor, p.set);
+    }, p.startAt);
   }
 
-  if (btn) setTimeout(() => btn.classList.remove('is-firing'), 1400);
+  // Sync the button: one .beat class-add per principal note. Audio + visual
+  // pulse fire on the matching setTimeout inside the chain animation, so all
+  // three (button flash, cell pulse, note hit) land in the same JS turn.
+  // Cleanup happens at totalDur — the button settles back to idle the same
+  // instant the last principal note decays.
+  if (btn) {
+    const principal = withTiming[0];
+    const totalDur = Math.max.apply(null, withTiming.map(p => p.startAt + p.dur));
+    for (let i = 0; i < principal.cells; i++) {
+      setTimeout(() => {
+        btn.classList.remove('beat');
+        // Force reflow so the keyframe restarts cleanly when beats land
+        // faster than the keyframe's own duration.
+        void btn.offsetWidth;
+        btn.classList.add('beat');
+      }, principal.startAt + i * principal.stepMs);
+    }
+    setTimeout(() => btn.classList.remove('beat'), totalDur);
+  }
 }
 
 function renderStreak(habit) {
