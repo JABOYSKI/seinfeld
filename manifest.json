@@ -8,11 +8,8 @@
   "background_color": "#0f1115",
   "theme_color": "#0f1115",
   "icons": [
-    {
-      "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23ff5a5f%22 stroke-width=%222.5%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><rect x=%223%22 y=%225%22 width=%2218%22 height=%2218%22 rx=%222%22/><line x1=%223%22 y1=%2210%22 x2=%2221%22 y2=%2210%22/><line x1=%227%22 y1=%222%22 x2=%227%22 y2=%227%22/><line x1=%2217%22 y1=%222%22 x2=%2217%22 y2=%227%22/></svg>",
-      "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

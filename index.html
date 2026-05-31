@@ -7,6 +7,8 @@
   <meta name="description" content="SEINFELD — a yearly wall-calendar habit tracker. Pick a habit, show up every day, fill the box. Don't break the chain." />
   <title>SEINFELD — don't break the chain</title>
   <link rel="manifest" href="manifest.json" />
+  <!-- iOS uses apple-touch-icon for the home-screen icon, not the manifest. -->
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <!-- Favicon: same line-art calendar as the in-app banner, but in brand red
        (#ff5a5f) with a thicker stroke so it stays legible at 16/32 px. -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23ff5a5f%22 stroke-width=%223%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><rect x=%223%22 y=%225%22 width=%2218%22 height=%2218%22 rx=%222%22/><line x1=%223%22 y1=%2210%22 x2=%2221%22 y2=%2210%22/><line x1=%227%22 y1=%222%22 x2=%227%22 y2=%227%22/><line x1=%2217%22 y1=%222%22 x2=%2217%22 y2=%227%22/></svg>" />
@@ -52,6 +54,19 @@
   <!-- Service worker (PWA / offline shell). Failure is non-fatal. -->
   <script>
     if ('serviceWorker' in navigator) {
+      // If a controller already exists at load, this tab is an UPDATE candidate:
+      // when a freshly-deployed SW activates and claims the page, reload once so
+      // the open tab runs the new assets instead of stale in-memory modules.
+      // (Guarded so the first-ever install — controller goes null->set — and
+      // repeat fires don't trigger a reload loop.)
+      if (navigator.serviceWorker.controller) {
+        var swReloaded = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (swReloaded) return;
+          swReloaded = true;
+          window.location.reload();
+        });
+      }
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('sw.js').catch(function(){});
       });

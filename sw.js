@@ -28,6 +28,9 @@ const SHELL = [
   './js/utils.js',
   './js/version.js',
   './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/icon-maskable-512.png',
 ];
 
 self.addEventListener('install', (e) => {
@@ -53,17 +56,39 @@ self.addEventListener('fetch', (e) => {
   // state are honored and we don't serve stale data.
   if (url.host.endsWith('supabase.co')) return;
 
+  // esm.sh CDN modules (the Supabase SDK graph) are immutable + version-pinned,
+  // so cache-first. This is what makes a cold OFFLINE boot work: without it the
+  // cross-origin import is never cached, so offline the import throws and the
+  // whole app fails to parse. After the first online visit the full module
+  // graph (entry + every sub-import esm.sh pulls) is cached here.
+  if (url.host === 'esm.sh') {
+    e.respondWith(
+      caches.match(req).then(hit => hit || fetch(req).then(res => {
+        if (res && (res.ok || res.type === 'opaque')) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      }))
+    );
+    return;
+  }
+
   // Network-first for our own shell so deploys propagate immediately when
   // online; fall back to cache when offline. `cache: 'no-cache'` forces the
   // browser HTTP cache to revalidate (sends If-None-Match), so ES-module
-  // imports without a `?v=` query string can't be served stale.
+  // imports without a `?v=` query string can't be served stale. If a cache
+  // miss coincides with being offline, a navigation falls back to the cached
+  // app shell so a deep link / refresh still boots.
   if (url.origin === self.location.origin) {
     e.respondWith(
       fetch(req, { cache: 'no-cache' }).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
         return res;
-      }).catch(() => caches.match(req))
+      }).catch(() => caches.match(req).then(hit =>
+        hit || (req.mode === 'navigation' ? caches.match('./index.html') : undefined)
+      ))
     );
   }
 });
