@@ -58,9 +58,11 @@ export function openChainPicker(onSelected) {
       clearTimeout(timer);
       // Strip any leftover state from a prior play so animations restart cleanly.
       // Regex catches every chain-* class so we don't need to update this list
-      // when new animation variants get added.
+      // when new animation variants get added — but explicitly skips
+      // `chain-preview-*` structural classes (they hold the 20×20 sizing of
+      // the preview cells; stripping them collapses the cells to 0 width).
       cells.forEach(c => {
-        c.className = c.className.replace(/\bchain-[a-z][\w-]*\b/g, '').replace(/\s+/g, ' ').trim();
+        c.className = c.className.replace(/\bchain-(?!preview)[a-z][\w-]*\b/g, '').replace(/\s+/g, ' ').trim();
         c.querySelectorAll('[class*="chain-"]').forEach(n => n.remove());
       });
       // Force reflow so re-adding classes restarts keyframes.
