@@ -48,16 +48,23 @@ export function openSoundPicker(onSelected) {
               <span class="pattern-trigger-caret" aria-hidden="true">▾</span>
             </button>
             <div class="pattern-picker-panel" id="patternPanel" role="listbox" hidden>
-              ${PATTERNS.map(p => `
-                <button type="button"
-                        class="pattern-option ${p.id === getSelectedPatternId() ? 'is-selected' : ''}"
-                        data-pattern="${p.id}"
-                        role="option"
-                        aria-selected="${p.id === getSelectedPatternId()}">
-                  <span class="pattern-option-name">${p.name}</span>
-                  <span class="pattern-option-blurb">${p.blurb}</span>
-                </button>
-              `).join('')}
+              <div class="pattern-panel-header">
+                <span class="pattern-panel-title">Traversal pattern</span>
+                <span class="pattern-panel-hint">Shape shows note order in a chain</span>
+              </div>
+              <div class="pattern-grid">
+                ${PATTERNS.map(p => `
+                  <button type="button"
+                          class="pattern-option ${p.id === getSelectedPatternId() ? 'is-selected' : ''}"
+                          data-pattern="${p.id}"
+                          role="option"
+                          aria-selected="${p.id === getSelectedPatternId()}"
+                          title="${p.blurb}">
+                    <span class="pattern-option-name">${p.name}</span>
+                    ${patternSparkline(p)}
+                  </button>
+                `).join('')}
+              </div>
             </div>
           </div>
         </div>
@@ -184,4 +191,28 @@ function getPatternName() {
   const id = getSelectedPatternId();
   const p = PATTERNS.find(x => x.id === id);
   return p ? p.name : '';
+}
+
+// Render a compact line+dot sparkline of how `pattern` traverses a 10-note
+// scale over its first 12 cells. Strokes use `currentColor` so the line
+// inherits the tile's text color (faded when idle, bright when selected).
+function patternSparkline(pattern, points = 12, n = 10) {
+  const steps = [];
+  for (let i = 0; i < points; i++) steps.push(pattern.step(i, n));
+  const min = Math.min.apply(null, steps);
+  const max = Math.max.apply(null, steps);
+  const range = Math.max(1, max - min);
+  const w = 100, h = 22, pad = 2;
+  const xs = (i) => pad + (i / (points - 1)) * (w - 2 * pad);
+  const ys = (v) => h - pad - ((v - min) / range) * (h - 2 * pad);
+  let line = `M${xs(0).toFixed(1)} ${ys(steps[0]).toFixed(1)}`;
+  let dots = '';
+  for (let i = 0; i < points; i++) {
+    if (i > 0) line += ` L${xs(i).toFixed(1)} ${ys(steps[i]).toFixed(1)}`;
+    dots += `<circle cx="${xs(i).toFixed(1)}" cy="${ys(steps[i]).toFixed(1)}" r="1.4" fill="currentColor"/>`;
+  }
+  return `<svg class="pattern-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <path d="${line}" fill="none" stroke="currentColor" stroke-width="0.8" stroke-opacity="0.55" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+  </svg>`;
 }
