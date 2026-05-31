@@ -17,6 +17,7 @@ import {
   getPitchShift, setPitchShift, PITCH_RANGE,
   PATTERNS, MAX_PATTERN_QUEUE, PATTERN_QUEUE_SECTION,
   getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
+  playPatternPreview,
 } from './audio.js';
 
 export function openSoundPicker(habits, initialHabitId, onSelected) {
@@ -287,12 +288,18 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     confirmBar.hidden = false;
   };
 
+  const previewArmed = () => {
+    if (!armedPatternId) return;
+    playPatternPreview(armedPatternId, getSelectedSoundId(), PATTERN_QUEUE_SECTION);
+  };
   const armPattern = (id) => {
     armedPatternId = id;
     patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
       opt.classList.toggle('is-armed', opt.dataset.pattern === id);
     });
     updateConfirmBar();
+    // Click = audition. Only the explicit Add button commits to queue.
+    previewArmed();
   };
   const disarm = () => {
     armedPatternId = null;
@@ -356,10 +363,12 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
       setSelectedSoundId(id);
       grid.querySelectorAll('.sound-tile').forEach(t => t.classList.toggle('is-selected', t === tile));
       // If a pattern is currently armed for confirmation, refresh the bar
-      // so it reflects the newly-picked scale (the entry that gets added
-      // will pair the armed pattern with this scale).
+      // + re-audition the armed pattern with this new scale so the user
+      // can hear the combo they're about to commit. Otherwise, play the
+      // full queue so the scale change is audible in context.
       updateConfirmBar();
-      previewSim();
+      if (armedPatternId) previewArmed();
+      else previewSim();
       if (onSelected) onSelected(id);
     });
   });

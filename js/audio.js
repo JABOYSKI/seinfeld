@@ -701,6 +701,28 @@ export function playBurst(habitId = null) {
   playMalletNote(freqAtWith(scale, pattern, safeLocal), { ...synth, gain: 0.65 });
 }
 
+// Plays a single (pattern, scale) combo in isolation — used by the sound
+// picker so clicking a pattern in the panel previews that pattern with
+// the currently selected scale, without touching the habit's queue at all.
+export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SECTION) {
+  const pattern = PATTERNS.find(p => p.id === patternId);
+  const scale = SCALES.find(s => s.id === scaleId);
+  if (!pattern || !scale || !scale.notes) return;
+  const c = ensureCtx();
+  if (!c) return;
+  const n = Math.max(1, Math.min(length, 64));
+  const stepMs = n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n));
+  const synth = scale.synth || {};
+  const startSec = c.currentTime;
+  for (let i = 0; i < n; i++) {
+    const gain = 0.4 + Math.min(i, 20) * 0.008;
+    playMalletNote(freqAtWith(scale, pattern, i), {
+      ...synth, gain,
+      when: (startSec - c.currentTime) + (i * stepMs) / 1000,
+    });
+  }
+}
+
 // Simulator-style preview: play a full chain of `length` notes using the
 // queue + scale resolution as if it were a real chain of that habit (or
 // the global default if no habit context is provided). Timing mirrors the
