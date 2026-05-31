@@ -350,6 +350,77 @@ export const PATTERNS = [
       const within = (p < half) ? p : (2 * half - 1 - p);
       return cycle * n + within;
     } },
+
+  // ----- 6 sample-drill flavored patterns -----
+  // Mimic melodic motifs you hear in sample drill (AXL Beats, Cash Cobain,
+  // Sleepy Hallow / Sheff G, Pop Smoke-era Brooklyn drill, anime/chipmunk
+  // soul sample chops). Pair these with a dark minor or pentatonic scale
+  // (min-pent, harmonic-minor, phrygian-dom, hirajoshi, iwato, haunted)
+  // for the proper menacing-melodic feel — major scales will sound playful
+  // instead of drill.
+  //
+  // All keep cycle climb shallow (≈1 step per phrase) so the loop sits in
+  // the same register the way a sample melody does, instead of marching
+  // up two octaves over a 30-cell chain.
+
+  // 808 SLIDE — high → upper-mid → lower-mid → bass, repeating. Captures
+  // the iconic drill 808 bass slide where the note drops sharply through
+  // the chord. Each new cycle slides from one note higher than the last.
+  { id: '808-slide',   name: '808 Slide',   blurb: 'Hi → lo bass-slide drill drop',
+    step: (i, n) => {
+      const cycle = Math.floor(i / 4);
+      const within = i % 4;
+      const map = [n - 1, Math.floor(n * 0.6), Math.floor(n * 0.3), 0];
+      return cycle + map[within];
+    } },
+
+  // CHIPMUNK — short 4-note vocal-sample loop that drifts up by one step
+  // per phrase, evoking the pitched-up "chipmunk soul" sample loop style
+  // (Cash Cobain, Bandmanrill, sexy drill). Tight, melodic, ear-wormy.
+  { id: 'chipmunk',    name: 'Chipmunk',    blurb: 'Pitched-up 4-note sample loop',
+    step: (i) => {
+      const phrase = [0, 4, 2, 5];
+      return Math.floor(i / 4) + phrase[i % 4];
+    } },
+
+  // SPIDER WALK — slow descending 3-note triplets, each triplet starting
+  // one step higher than the previous. The classic creepy, melancholic
+  // descending-line motif behind a lot of UK drill samples.
+  { id: 'spider-walk', name: 'Spider Walk', blurb: 'Creeping descending triplets',
+    step: (i) => {
+      const cycle = Math.floor(i / 3);
+      const within = i % 3;
+      return cycle + (2 - within);
+    } },
+
+  // DRILL STAB — root, 5th-ish, back to root, then a higher accent stab.
+  // The two-note bounce + accent is the bedrock of AXL Beats-style plucky
+  // drill melodies; the high stab is what makes it feel punchy instead of
+  // monotonous.
+  { id: 'drill-stab',  name: 'Drill Stab',  blurb: 'Two-note stab with high accent',
+    step: (i) => {
+      const phrase = [0, 5, 0, 7];
+      return Math.floor(i / 4) + phrase[i % 4];
+    } },
+
+  // SAMPLE CHOP — broken chord with an octave leap in the middle. Mimics
+  // the chopped-piano / sliced-vocal sample style where producers cut a
+  // chord into root → octave-up → mid-chord pieces. Slow cycle climb so
+  // the loop doesn't run away from its register.
+  { id: 'sample-chop', name: 'Sample Chop', blurb: 'Chopped chord, octave leap',
+    step: (i, n) => {
+      const phrase = [0, n, Math.floor(n / 2)];
+      return Math.floor(Math.floor(i / 3) / 2) + phrase[i % 3];
+    } },
+
+  // PLUCK STAB — anchor-reach-up motif: root, reach up a step, reach
+  // higher, back to anchor. That tight "pluck-pluck-stretch-resolve" feel
+  // of a melodic drill pluck line (Sleepy Hallow producers, anime-drill).
+  { id: 'pluck-stab',  name: 'Pluck Stab',  blurb: 'Anchor-reach pluck motif',
+    step: (i) => {
+      const phrase = [0, 1, 3, 0];
+      return Math.floor(i / 4) + phrase[i % 4];
+    } },
 ];
 
 export const DEFAULT_SOUND_ID = 'off';
