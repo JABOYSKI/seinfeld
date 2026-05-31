@@ -1072,6 +1072,84 @@ button { font: inherit; color: inherit; }
 /* `display: flex/grid` above otherwise wins over the user-agent `[hidden]`
    rule and the panel becomes impossible to close. */
 .pattern-picker-panel[hidden] { display: none; }
+
+/* "Armed" pattern — clicked once but not yet committed to the queue. The
+   user must click "Add to queue" in the confirm bar (or click the same
+   tile again as a shortcut) before it actually lands in the queue. */
+.pattern-option.is-armed {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-elev));
+  border-color: var(--accent);
+  color: var(--text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.pattern-option.is-armed .pattern-spark {
+  color: var(--accent);
+}
+
+/* Confirm bar — appears at the bottom of the panel only when a pattern is
+   armed. Shows what's about to be added and gives the user an explicit
+   commit/cancel choice instead of clicks adding silently. */
+.pattern-confirm-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px -6px -6px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elev));
+  border-top: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-light));
+  border-radius: 0 0 12px 12px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.pattern-confirm-bar[hidden] { display: none; }
+.pattern-confirm-bar .pcb-label,
+.pattern-confirm-bar .pcb-sep { color: var(--text-faint); font-weight: 500; }
+.pattern-confirm-bar .pcb-pattern,
+.pattern-confirm-bar .pcb-scale {
+  color: var(--text);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.pattern-confirm-bar .pcb-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.pattern-confirm-bar .pcb-cancel,
+.pattern-confirm-bar .pcb-add {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.pattern-confirm-bar .pcb-cancel {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.pattern-confirm-bar .pcb-cancel:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.pattern-confirm-bar .pcb-add {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--accent-text);
+}
+.pattern-confirm-bar .pcb-add:hover:not([disabled]) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.pattern-confirm-bar .pcb-add[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .pattern-panel-header {
   display: flex;
   align-items: baseline;

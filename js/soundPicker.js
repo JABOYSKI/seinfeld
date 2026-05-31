@@ -83,6 +83,16 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
                   </button>
                 `).join('')}
               </div>
+              <div class="pattern-confirm-bar" id="patternConfirmBar" hidden>
+                <span class="pcb-label">Add</span>
+                <span class="pcb-pattern" id="pcbPattern"></span>
+                <span class="pcb-sep">with</span>
+                <span class="pcb-scale" id="pcbScale"></span>
+                <span class="pcb-actions">
+                  <button type="button" class="pcb-cancel" id="pcbCancel">Cancel</button>
+                  <button type="button" class="pcb-add btn-primary" id="pcbAdd">Add to queue</button>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -142,6 +152,8 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     patternPanel.hidden = true;
     const trigger = overlay.querySelector('#patternTrigger');
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    // Always drop any pending arm so reopening starts fresh.
+    if (typeof disarm === 'function') disarm();
   };
   const openPatternPanel = () => {
     if (!editingHabitId) return; // no habit to add to
@@ -175,6 +187,7 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
         const id = tab.dataset.habit;
         if (id === editingHabitId) return;
         editingHabitId = id;
+        if (typeof disarm === 'function') disarm();
         renderHabitTabs();
         renderQueueChips();
         closePatternPanel();
@@ -245,23 +258,76 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   renderHabitTabs();
   renderQueueChips();
 
-  // Clicking a panel option ADDS to queue (with current scale captured).
-  // Panel stays open so the user can rapidly build a sequence; auto-
-  // closes when the queue hits its cap.
+  // Clicking a panel option ARMS it for confirmation instead of adding
+  // straight away — prevents the "click click click oh no I added three"
+  // problem. The confirm bar at the bottom of the panel shows the armed
+  // pattern + the scale it will be paired with; clicking "Add to queue"
+  // (or pressing Enter) commits, clicking "Cancel" (or Escape, or another
+  // pattern) re-arms or dismisses.
+  let armedPatternId = null;
+  const confirmBar = overlay.querySelector('#patternConfirmBar');
+  const pcbPattern = overlay.querySelector('#pcbPattern');
+  const pcbScale = overlay.querySelector('#pcbScale');
+  const pcbAdd = overlay.querySelector('#pcbAdd');
+  const pcbCancel = overlay.querySelector('#pcbCancel');
+
+  const updateConfirmBar = () => {
+    if (!armedPatternId) {
+      confirmBar.hidden = true;
+      return;
+    }
+    const p = PATTERNS.find(x => x.id === armedPatternId);
+    const s = SCALES.find(x => x.id === getSelectedSoundId());
+    pcbPattern.textContent = p ? p.name : '?';
+    pcbScale.textContent = s ? s.name : 'default';
+    const queueLen = editingHabitId ? getPatternQueue(editingHabitId).length : 0;
+    const full = queueLen >= MAX_PATTERN_QUEUE || !editingHabitId;
+    pcbAdd.disabled = full;
+    pcbAdd.title = full ? (!editingHabitId ? 'Pick a habit first' : 'Queue full') : 'Commit to queue';
+    confirmBar.hidden = false;
+  };
+
+  const armPattern = (id) => {
+    armedPatternId = id;
+    patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
+      opt.classList.toggle('is-armed', opt.dataset.pattern === id);
+    });
+    updateConfirmBar();
+  };
+  const disarm = () => {
+    armedPatternId = null;
+    patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
+      opt.classList.remove('is-armed');
+    });
+    updateConfirmBar();
+  };
+  const commitArmed = () => {
+    if (!armedPatternId || !editingHabitId) return;
+    const scaleId = getSelectedSoundId();
+    const before = getPatternQueue(editingHabitId).length;
+    const after = addToPatternQueue(editingHabitId, { pattern: armedPatternId, scale: scaleId }).length;
+    if (after === before) return;
+    disarm();
+    renderQueueChips();
+    previewSim();
+    if (after >= MAX_PATTERN_QUEUE) closePatternPanel();
+  };
+
   patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!editingHabitId) return;
       const patternId = opt.dataset.pattern;
-      const scaleId = getSelectedSoundId();
-      const before = getPatternQueue(editingHabitId).length;
-      const after = addToPatternQueue(editingHabitId, { pattern: patternId, scale: scaleId }).length;
-      if (after === before) return; // queue full
-      renderQueueChips();
-      previewSim();
-      if (after >= MAX_PATTERN_QUEUE) closePatternPanel();
+      // Clicking the same armed pattern again is a quick way to commit.
+      if (armedPatternId === patternId) {
+        commitArmed();
+        return;
+      }
+      armPattern(patternId);
     });
   });
+  pcbAdd.addEventListener('click', (e) => { e.stopPropagation(); commitArmed(); });
+  pcbCancel.addEventListener('click', (e) => { e.stopPropagation(); disarm(); });
 
   overlay.querySelector('#queueClear').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -289,6 +355,10 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
       const id = tile.dataset.sound;
       setSelectedSoundId(id);
       grid.querySelectorAll('.sound-tile').forEach(t => t.classList.toggle('is-selected', t === tile));
+      // If a pattern is currently armed for confirmation, refresh the bar
+      // so it reflects the newly-picked scale (the entry that gets added
+      // will pair the armed pattern with this scale).
+      updateConfirmBar();
       previewSim();
       if (onSelected) onSelected(id);
     });
