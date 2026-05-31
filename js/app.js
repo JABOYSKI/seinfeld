@@ -8,13 +8,16 @@ import { renderCalendar, renderAllCalendar, renderContinuousCalendar, renderCont
 import { currentStreak, longestStreak } from './streak.js';
 
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
-import { toast, todayISO, canEditDay } from './utils.js';
+import { toast, todayISO, daysAgoISO, canEditDay } from './utils.js';
 import { getSelectedAnimationId, FILL_ANIMATION_DURATION_MS } from './fillAnimations.js';
 import { openAnimationPicker } from './animationPicker.js';
 import { openChainPicker } from './chainPicker.js';
 import { openSoundPicker } from './soundPicker.js';
 import { getSelectedSoundId } from './audio.js';
 import { playChainAnimation } from './chainBuild.js';
+// Direct (no 350 ms fill-buffer + milestone-toast wrapper) — used by the
+// symphony button to fire many chains in a tight orchestral stagger.
+import { playChainAnimation as playChainAnimationDirect } from './chainAnimations.js';
 
 const MAX_HABITS = 5;
 
@@ -163,6 +166,7 @@ function renderShell() {
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
         <button class="icon-btn ${getSelectedSoundId() !== 'off' ? 'is-active' : ''}" id="soundBtn" title="Choose chain sound">${getSelectedSoundId() === 'off' ? '🔇' : '🔊'}</button>
+        <button class="icon-btn icon-btn-symphony" id="symphonyBtn" title="Play all active chains together">🎼</button>
         <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${viewToggleIcon()}</button>
         <button class="icon-btn ${getShowWeekNumbers() ? 'is-active' : ''}" id="weekNumBtn" title="Toggle week numbers (continuous view)">#</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
@@ -221,6 +225,8 @@ function renderShell() {
       toast(`Sound: ${id}`, 'info');
     });
   });
+  const symphonyBtn = document.getElementById('symphonyBtn');
+  symphonyBtn.addEventListener('click', () => playSymphony(symphonyBtn));
   els.signoutBtn.addEventListener('click', async () => {
     await signOut();
     showAuth();
@@ -416,6 +422,78 @@ async function loadAndRenderAllCalendar() {
   }
   els.calendar.classList.toggle('with-week-numbers', getShowWeekNumbers());
   renderAllSummary();
+}
+
+// Ensures every habit's completions Set is present in state.completionsByHabit
+// so the symphony can compute streaks for all of them, regardless of which
+// view the user is currently in. The single-habit view only loads the active
+// habit's data, so we fold its set in and fetch the rest.
+async function ensureAllCompletionsLoaded() {
+  if (state.currentHabitId && state.currentHabitId !== ALL_VIEW_ID) {
+    state.completionsByHabit.set(state.currentHabitId, state.completions);
+  }
+  const missing = state.habits.filter(h => !state.completionsByHabit.has(h.id));
+  if (missing.length === 0) return;
+  const continuous = getViewMode() === 'continuous';
+  const fromYear = state.currentYear;
+  const toYear = continuous ? state.currentYear + (CONTINUOUS_YEARS - 1) : state.currentYear;
+  const results = await Promise.all(
+    missing.map(h =>
+      (continuous
+        ? loadCompletionsInRange(h.id, fromYear, toYear)
+        : loadCompletions(h.id, fromYear)
+      ).then(set => [h.id, set])
+    )
+  );
+  for (const [id, set] of results) state.completionsByHabit.set(id, set);
+}
+
+// Fires every habit's current chain at once. Chains start with a small
+// per-habit stagger so the opening attack is an orchestral roll-in instead
+// of a wall-of-sound chord, and so the visual pulses don't all collide on
+// the same anchor cell in the same frame.
+const SYMPHONY_STAGGER_MS = 70;
+async function playSymphony(btn) {
+  if (!state.habits.length) { toast('No habits yet — create one first.', 'info'); return; }
+  if (btn) btn.classList.add('is-firing');
+  try {
+    await ensureAllCompletionsLoaded();
+  } catch (e) {
+    toast(`Couldn't load chains: ${e.message}`, 'error');
+    if (btn) btn.classList.remove('is-firing');
+    return;
+  }
+
+  const today = todayISO();
+  const yesterday = daysAgoISO(1);
+  const playable = [];
+  for (const habit of state.habits) {
+    const set = state.completionsByHabit.get(habit.id);
+    if (!set || set.size === 0) continue;
+    const streak = currentStreak(set, habit.created_at);
+    if (streak < 2) continue;
+    const anchor = set.has(today) ? today : (set.has(yesterday) ? yesterday : null);
+    if (!anchor) continue;
+    playable.push({ habit, streak, anchor, set });
+  }
+
+  if (playable.length === 0) {
+    toast('No active chains — fill in some days first.', 'info');
+    if (btn) btn.classList.remove('is-firing');
+    return;
+  }
+
+  // Sort longest-first so the biggest cascade leads and the shorter chains
+  // layer in beneath it — feels like the principal voice plus accompaniment.
+  playable.sort((a, b) => b.streak - a.streak);
+  for (let i = 0; i < playable.length; i++) {
+    const { habit, streak, anchor, set } = playable[i];
+    setTimeout(() => {
+      playChainAnimationDirect(els.calendar, streak, habit, anchor, set);
+    }, i * SYMPHONY_STAGGER_MS);
+  }
+
+  if (btn) setTimeout(() => btn.classList.remove('is-firing'), 1400);
 }
 
 function renderStreak(habit) {
