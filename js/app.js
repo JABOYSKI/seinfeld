@@ -162,6 +162,11 @@ function renderShell() {
           </svg>
           <span class="logo-text">Seinfeld</span>
         </div>
+        <button class="symphony-btn" id="symphonyBtn" type="button" aria-label="Play every active chain" title="Play every active chain">
+          <svg class="symphony-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M8.5 6.2 L17.8 11.5 a0.6 0.6 0 0 1 0 1.04 L8.5 17.85 a0.6 0.6 0 0 1 -0.9 -0.52 V6.72 a0.6 0.6 0 0 1 0.9 -0.52 Z"/>
+          </svg>
+        </button>
         <div class="header-spacer"></div>
         <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
@@ -186,10 +191,6 @@ function renderShell() {
         <div class="year-label" id="yearLabel">${state.currentYear}</div>
         <button class="icon-btn" id="yearNext" title="Next year">›</button>
         <div class="header-spacer"></div>
-        <button class="symphony-btn" id="symphonyBtn" type="button" title="Play every active chain together">
-          <span class="symphony-icon" aria-hidden="true">🎼</span>
-          <span class="symphony-label">Play Symphony</span>
-        </button>
         <div class="streak-chip" id="streakChip"></div>
       </div>
       <div class="calendar" id="calendar"></div>

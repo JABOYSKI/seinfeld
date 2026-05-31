@@ -738,25 +738,25 @@ button { font: inherit; color: inherit; }
   font-weight: 800;
 }
 
-/* Symphony — the headline "play every active chain" action. Lives in the
-   year-bar instead of the header settings cluster because it's a primary
-   user action, not a preference toggle. Subtle ambient glow when idle so
-   it stays inviting; sharper pulse + scale while is-firing fires. */
+/* Symphony — the headline "play every active chain" action. A bare
+   circular play button: minimal, modern, no jargon. Lives in the year-bar
+   so it reads as a primary action on the calendar rather than just
+   another preference toggle. */
 .symphony-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px 8px 12px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin-left: 6px;
   color: var(--accent-text);
   background: var(--accent);
   border: 1px solid var(--accent);
-  border-radius: 999px;
+  border-radius: 50%;
   cursor: pointer;
   font-family: inherit;
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 30%, transparent);
   transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 .symphony-btn:hover {
@@ -769,19 +769,21 @@ button { font: inherit; color: inherit; }
   transform: translateY(0);
   box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
 }
-.symphony-icon { font-size: 16px; line-height: 1; }
-.symphony-label { line-height: 1; }
+.symphony-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  /* Optical centering: the play triangle's visual mass sits left of its
+     bounding box, so nudge it a hair right so it looks centered. */
+  margin-left: 1px;
+}
 .symphony-btn.is-firing {
   animation: symphonyPulse 700ms ease-out 2;
 }
 @keyframes symphonyPulse {
   0%   { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); }
-  50%  { transform: scale(1.07); box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent); }
+  50%  { transform: scale(1.1);  box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 0%, transparent); }
   100% { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
-}
-@media (max-width: 540px) {
-  .symphony-label { display: none; }
-  .symphony-btn { padding: 8px 12px; }
 }
 
 /* Sound picker: compact tiles in a 3-col grid (2 on narrow screens). With
