@@ -1171,6 +1171,25 @@ button { font: inherit; color: inherit; }
   color: var(--text-faint);
   font-style: italic;
 }
+.dbl-add-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-faint);
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+.dbl-add-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.dbl-add-toggle:hover { color: var(--text); }
+.pattern-panel-header { flex-wrap: wrap; }
 .pattern-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

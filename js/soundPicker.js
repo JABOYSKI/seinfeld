@@ -71,6 +71,10 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
               <div class="pattern-panel-header">
                 <span class="pattern-panel-title">Add a pattern</span>
                 <span class="pattern-panel-hint">Pairs with the scale you've selected below</span>
+                <label class="dbl-add-toggle" title="When on, clicking an already-armed pattern commits it to the queue (skip the Add button)">
+                  <input type="checkbox" id="dblAddToggle" />
+                  <span>Double-click to add</span>
+                </label>
               </div>
               <div class="pattern-grid">
                 ${PATTERNS.map(p => `
@@ -320,14 +324,27 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     if (after >= MAX_PATTERN_QUEUE) closePatternPanel();
   };
 
+  // Opt-in shortcut: clicking an already-armed pattern can commit it
+  // directly (skipping the Add button). Off by default — the explicit Add
+  // button is the only way to land an entry in the queue unless the user
+  // turns this on.
+  const DBL_ADD_STORAGE_KEY = 'seinfeld_sound_dblclick_add';
+  const dblAddToggle = overlay.querySelector('#dblAddToggle');
+  dblAddToggle.checked = localStorage.getItem(DBL_ADD_STORAGE_KEY) === 'true';
+  dblAddToggle.addEventListener('change', () => {
+    localStorage.setItem(DBL_ADD_STORAGE_KEY, dblAddToggle.checked ? 'true' : 'false');
+  });
+
   patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!editingHabitId) return;
       const patternId = opt.dataset.pattern;
-      // Clicking the same armed pattern again is a quick way to commit.
+      // Re-click on the armed pattern: commit only if the user has opted
+      // into double-click-to-add; otherwise just re-audition.
       if (armedPatternId === patternId) {
-        commitArmed();
+        if (dblAddToggle.checked) commitArmed();
+        else previewArmed();
         return;
       }
       armPattern(patternId);
