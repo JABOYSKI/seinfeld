@@ -1,7 +1,16 @@
-// Picker modal for chain-build sounds. The simulator at the top lets you
-// preview at any chain length; the pattern queue below it lets you stitch
-// up to MAX_PATTERN_QUEUE patterns into a sequence that the chain rotates
-// through (PATTERN_QUEUE_SECTION cells per pattern).
+// Picker modal for chain-build sounds.
+//
+// Layout:
+//   - Simulator (length / octave / pitch sliders + Play)
+//   - Per-habit pattern queue editor: tab strip across habits, then a chip
+//     bar for the selected habit's queue. Each chip is one (pattern, scale)
+//     pair; "+ Add" opens the pattern panel — clicking a pattern pushes a
+//     new entry into the queue that captures whatever scale is currently
+//     selected in the grid below. So workflow is: pick scale, click pattern,
+//     repeat with a different scale, etc.
+//   - Scale grid (the global default sound — used as the per-entry scale
+//     when adding new queue entries, and as fallback for habits with no
+//     queue at all).
 import {
   SCALES, getSelectedSoundId, setSelectedSoundId, playSimulation,
   getOctaveShift, setOctaveShift, OCTAVE_RANGE,
@@ -10,8 +19,16 @@ import {
   getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
 } from './audio.js';
 
-export function openSoundPicker(onSelected) {
-  const currentId = getSelectedSoundId();
+export function openSoundPicker(habits, initialHabitId, onSelected) {
+  const currentScaleId = getSelectedSoundId();
+  // The habit whose queue is currently being edited inside the picker. If
+  // the caller didn't pass an initial habit (e.g. no habits exist yet),
+  // fall back to the first habit available; if there are none, leave null
+  // and the queue UI will show a friendly empty state.
+  const realHabits = Array.isArray(habits) ? habits : [];
+  let editingHabitId = (initialHabitId && realHabits.some(h => h.id === initialHabitId))
+    ? initialHabitId
+    : (realHabits[0]?.id || null);
 
   const overlay = document.createElement('div');
   overlay.className = 'overlay overlay-picker';
@@ -19,13 +36,13 @@ export function openSoundPicker(onSelected) {
     <div class="dialog dialog-picker dialog-sound-picker" role="dialog" aria-modal="true" aria-label="Choose chain sound">
       <div class="picker-header">
         <h2>Chain sound</h2>
-        <p class="picker-sub">Mallet hits play as your chain lights up.</p>
+        <p class="picker-sub">Each habit has its own queue of (pattern, scale) pairs the chain rotates through.</p>
       </div>
 
       <div class="sound-simulator">
         <label class="sim-label" for="simLength">Simulate chain length</label>
         <div class="sim-row">
-          <input type="range" id="simLength" min="2" max="128" value="16" />
+          <input type="range" id="simLength" min="2" max="256" value="16" />
           <span class="sim-value" id="simLengthValue">16</span>
           <button type="button" class="btn btn-primary sim-play" id="simPlay">Play</button>
         </div>
@@ -39,18 +56,20 @@ export function openSoundPicker(onSelected) {
           <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
           <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
         </div>
+
         <label class="sim-label">
-          Pattern queue
+          Queue for
+          <span class="queue-habit-tabs" id="queueHabitTabs"></span>
           <span class="queue-count" id="queueCount">0/${MAX_PATTERN_QUEUE}</span>
-          <button type="button" class="queue-clear-link" id="queueClear" title="Clear queue">Clear</button>
+          <button type="button" class="queue-clear-link" id="queueClear" title="Clear this habit's queue">Clear</button>
         </label>
         <div class="sim-row pattern-row">
           <div class="pattern-picker-wrap">
             <div class="pattern-queue-bar" id="patternQueueBar"></div>
             <div class="pattern-picker-panel" id="patternPanel" role="listbox" hidden>
               <div class="pattern-panel-header">
-                <span class="pattern-panel-title">Add to queue</span>
-                <span class="pattern-panel-hint">Click to add — sparkline shows note order</span>
+                <span class="pattern-panel-title">Add a pattern</span>
+                <span class="pattern-panel-hint">Pairs with the scale you've selected below</span>
               </div>
               <div class="pattern-grid">
                 ${PATTERNS.map(p => `
@@ -67,13 +86,16 @@ export function openSoundPicker(onSelected) {
             </div>
           </div>
         </div>
-        <p class="sim-hint">Each queued pattern plays for ${PATTERN_QUEUE_SECTION} cells, then the next.</p>
+        <p class="sim-hint">
+          Each entry plays for ${PATTERN_QUEUE_SECTION} cells, then the next.
+          Up to ${MAX_PATTERN_QUEUE} entries (≈5 years of daily plays).
+        </p>
       </div>
 
       <div class="picker-grid picker-grid-sound" id="soundPickerGrid">
         ${SCALES.map(s => `
           <button type="button"
-                  class="picker-tile sound-tile ${s.id === currentId ? 'is-selected' : ''}"
+                  class="picker-tile sound-tile ${s.id === currentScaleId ? 'is-selected' : ''}"
                   data-sound="${s.id}"
                   title="${s.blurb}">
             <span class="sound-tile-icon">${s.id === 'off' ? '🔇' : '🎵'}</span>
@@ -99,8 +121,8 @@ export function openSoundPicker(onSelected) {
   const simPitchValue = overlay.querySelector('#simPitchValue');
   const queueBar = overlay.querySelector('#patternQueueBar');
   const queueCount = overlay.querySelector('#queueCount');
+  const queueHabitTabs = overlay.querySelector('#queueHabitTabs');
   const patternPanel = overlay.querySelector('#patternPanel');
-  const wrap = overlay.querySelector('.pattern-picker-wrap');
 
   simLength.addEventListener('input', () => { simValue.textContent = simLength.value; });
 
@@ -114,7 +136,7 @@ export function openSoundPicker(onSelected) {
     simPitchValue.textContent = formatSigned(v);
   });
 
-  // ----- pattern queue -----
+  // ----- pattern queue (per-habit) -----
 
   const closePatternPanel = () => {
     patternPanel.hidden = true;
@@ -122,37 +144,76 @@ export function openSoundPicker(onSelected) {
     if (trigger) trigger.setAttribute('aria-expanded', 'false');
   };
   const openPatternPanel = () => {
+    if (!editingHabitId) return; // no habit to add to
     patternPanel.hidden = false;
     const trigger = overlay.querySelector('#patternTrigger');
     if (trigger) trigger.setAttribute('aria-expanded', 'true');
   };
 
   const previewSim = () => {
-    playSimulation(getSelectedSoundId(), parseInt(simLength.value, 10));
+    playSimulation(parseInt(simLength.value, 10), editingHabitId);
+  };
+
+  const renderHabitTabs = () => {
+    if (realHabits.length === 0) {
+      queueHabitTabs.innerHTML = `<span class="queue-no-habits">— create a habit to set up a queue —</span>`;
+      return;
+    }
+    queueHabitTabs.innerHTML = realHabits.map(h => `
+      <button type="button"
+              class="queue-habit-tab ${h.id === editingHabitId ? 'is-active' : ''}"
+              data-habit="${h.id}"
+              title="${escapeAttr(h.name)}"
+              style="--qh-color:${h.color}">
+        <span class="qh-dot"></span>
+        <span class="qh-name">${escapeHTML(h.name)}</span>
+      </button>
+    `).join('');
+    queueHabitTabs.querySelectorAll('.queue-habit-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = tab.dataset.habit;
+        if (id === editingHabitId) return;
+        editingHabitId = id;
+        renderHabitTabs();
+        renderQueueChips();
+        closePatternPanel();
+      });
+    });
   };
 
   const renderQueueChips = () => {
-    const q = getPatternQueue();
-    const chips = q.map((id, idx) => {
-      const p = PATTERNS.find(x => x.id === id);
+    const q = editingHabitId ? getPatternQueue(editingHabitId) : [];
+    const chips = q.map((entry, idx) => {
+      const p = PATTERNS.find(x => x.id === entry.pattern);
+      const s = entry.scale ? SCALES.find(x => x.id === entry.scale) : null;
+      const scaleLabel = s ? s.name : 'default';
+      const scaleClass = s ? 'has-scale' : 'no-scale';
       return `
-        <span class="pattern-queue-chip" data-index="${idx}" title="${p ? p.blurb : ''}">
+        <span class="pattern-queue-chip ${scaleClass}" data-index="${idx}" title="${p ? p.name : '?'} · ${scaleLabel}">
           <span class="chip-num">${idx + 1}</span>
-          <span class="chip-name">${p ? p.name : 'Unknown'}</span>
+          <span class="chip-body">
+            <span class="chip-pattern">${p ? escapeHTML(p.name) : '?'}</span>
+            <span class="chip-scale">${escapeHTML(scaleLabel)}</span>
+          </span>
           <button type="button" class="chip-remove" data-index="${idx}" aria-label="Remove from queue" tabindex="-1">×</button>
         </span>
       `;
     }).join('');
     const isFull = q.length >= MAX_PATTERN_QUEUE;
     const isEmpty = q.length === 0;
+    const disabledReason = !editingHabitId
+      ? 'disabled title="Create a habit first"'
+      : isFull
+        ? 'disabled title="Queue full"'
+        : 'title="Add pattern using the currently selected scale"';
     const trigger = `
       <button type="button"
               class="pattern-queue-add"
               id="patternTrigger"
               aria-haspopup="listbox"
               aria-expanded="${patternPanel.hidden ? 'false' : 'true'}"
-              ${isFull ? 'disabled' : ''}
-              title="${isFull ? 'Queue full' : 'Add pattern to queue'}">
+              ${disabledReason}>
         <span class="add-plus">+</span>${isEmpty ? '<span class="add-label">Add pattern</span>' : ''}
       </button>
     `;
@@ -160,18 +221,16 @@ export function openSoundPicker(onSelected) {
     queueCount.textContent = `${q.length}/${MAX_PATTERN_QUEUE}`;
     queueBar.classList.toggle('is-empty', isEmpty);
 
-    // Wire the dynamically-created chip removes
     queueBar.querySelectorAll('.chip-remove').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (!editingHabitId) return;
         const idx = parseInt(btn.dataset.index, 10);
-        removeFromPatternQueue(idx);
+        removeFromPatternQueue(editingHabitId, idx);
         renderQueueChips();
-        updatePanelSelection();
         previewSim();
       });
     });
-    // Wire the dynamically-created + Add trigger
     const trig = queueBar.querySelector('#patternTrigger');
     if (trig) {
       trig.addEventListener('click', (e) => {
@@ -182,31 +241,23 @@ export function openSoundPicker(onSelected) {
     }
   };
 
-  const updatePanelSelection = () => {
-    const queued = new Set(getPatternQueue());
-    patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
-      const inQueue = queued.has(opt.dataset.pattern);
-      opt.classList.toggle('is-selected', inQueue);
-      opt.setAttribute('aria-selected', inQueue ? 'true' : 'false');
-    });
-  };
-
   // Initial render
+  renderHabitTabs();
   renderQueueChips();
-  updatePanelSelection();
 
-  // Clicking a panel option ADDS to queue (and keeps the panel open so the
-  // user can rapidly build a sequence). The panel auto-closes only when
-  // the queue hits its cap.
+  // Clicking a panel option ADDS to queue (with current scale captured).
+  // Panel stays open so the user can rapidly build a sequence; auto-
+  // closes when the queue hits its cap.
   patternPanel.querySelectorAll('.pattern-option').forEach(opt => {
     opt.addEventListener('click', (e) => {
       e.stopPropagation();
-      const id = opt.dataset.pattern;
-      const before = getPatternQueue().length;
-      const after = addToPatternQueue(id).length;
-      if (after === before) return; // queue full and add rejected
+      if (!editingHabitId) return;
+      const patternId = opt.dataset.pattern;
+      const scaleId = getSelectedSoundId();
+      const before = getPatternQueue(editingHabitId).length;
+      const after = addToPatternQueue(editingHabitId, { pattern: patternId, scale: scaleId }).length;
+      if (after === before) return; // queue full
       renderQueueChips();
-      updatePanelSelection();
       previewSim();
       if (after >= MAX_PATTERN_QUEUE) closePatternPanel();
     });
@@ -214,13 +265,13 @@ export function openSoundPicker(onSelected) {
 
   overlay.querySelector('#queueClear').addEventListener('click', (e) => {
     e.stopPropagation();
-    clearPatternQueue();
+    if (!editingHabitId) return;
+    clearPatternQueue(editingHabitId);
     renderQueueChips();
-    updatePanelSelection();
     previewSim();
   });
 
-  // Click anywhere outside the panel and trigger → close panel.
+  // Click anywhere outside panel + trigger → close panel.
   overlay.addEventListener('click', (e) => {
     if (patternPanel.hidden) return;
     if (patternPanel.contains(e.target)) return;
@@ -238,8 +289,7 @@ export function openSoundPicker(onSelected) {
       const id = tile.dataset.sound;
       setSelectedSoundId(id);
       grid.querySelectorAll('.sound-tile').forEach(t => t.classList.toggle('is-selected', t === tile));
-      // Preview at the simulator length so the user can A/B scales quickly.
-      playSimulation(id, parseInt(simLength.value, 10));
+      previewSim();
       if (onSelected) onSelected(id);
     });
   });
@@ -258,6 +308,11 @@ function formatSigned(v) {
   if (v === 0) return '0';
   return v > 0 ? `+${v}` : `${v}`;
 }
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return escapeHTML(s); }
 
 // Render a compact line+dot sparkline of how `pattern` traverses a 10-note
 // scale over its first 12 cells. Strokes use `currentColor` so the line

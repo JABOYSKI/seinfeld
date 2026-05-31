@@ -884,11 +884,11 @@ button { font: inherit; color: inherit; }
 .pattern-queue-chip {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   padding: 3px 3px 3px 6px;
   background: var(--accent);
   color: var(--accent-text);
-  border-radius: 999px;
+  border-radius: 10px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -907,7 +907,23 @@ button { font: inherit; color: inherit; }
   padding: 0 5px;
   min-width: 14px;
   height: 14px;
-  margin-right: 3px;
+  flex-shrink: 0;
+}
+.chip-body {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 1px 4px 1px 2px;
+  line-height: 1.1;
+}
+.chip-pattern { font-size: 11px; font-weight: 700; }
+.chip-scale {
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.78;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .chip-name { line-height: 1; padding: 0 2px; }
 .chip-remove {
@@ -991,6 +1007,54 @@ button { font: inherit; color: inherit; }
   font-family: inherit;
 }
 .queue-clear-link:hover { color: var(--text); }
+
+/* Habit-tab strip inside the queue label — picks which habit's queue is
+   being edited. Each tab shows a small color dot + the habit name. */
+.queue-habit-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+.queue-no-habits {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+  font-weight: 500;
+}
+.queue-habit-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: border-color 120ms, background 120ms, color 120ms;
+}
+.queue-habit-tab .qh-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--qh-color);
+  flex-shrink: 0;
+}
+.queue-habit-tab:hover {
+  border-color: var(--text-dim);
+  color: var(--text);
+}
+.queue-habit-tab.is-active {
+  border-color: var(--qh-color);
+  background: color-mix(in srgb, var(--qh-color) 14%, transparent);
+  color: var(--text);
+}
 .pattern-picker-panel {
   position: absolute;
   top: calc(100% + 6px);

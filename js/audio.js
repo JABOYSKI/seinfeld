@@ -414,16 +414,21 @@ export const PATTERNS = [
 
 export const DEFAULT_SOUND_ID = 'off';
 export const DEFAULT_PATTERN_ID = 'ascending';
-// Queue of up to MAX_PATTERN_QUEUE patterns the chain rotates through.
-// Each pattern plays for PATTERN_QUEUE_SECTION cells before the next
-// takes over. Empty queue → fall back to the single-pattern selection.
-export const MAX_PATTERN_QUEUE = 16;
+// Per-habit queue of {pattern, scale} entries the chain rotates through.
+// Each entry plays for PATTERN_QUEUE_SECTION cells, then the next entry
+// takes over (looping when the queue runs out). Max length is ~5 years of
+// daily plays (5 × 365 = 1825) so a user can compose a year-after-year
+// sound for a single habit if they want. Empty queue → fall back to the
+// single-pattern + global-scale selection for backwards compat.
+export const MAX_PATTERN_QUEUE = 1825;
 export const PATTERN_QUEUE_SECTION = 8;
 const STORAGE_KEY = 'seinfeld_sound_scale';
 const OCTAVE_STORAGE_KEY = 'seinfeld_sound_octave';
 const PITCH_STORAGE_KEY = 'seinfeld_sound_pitch';
 const PATTERN_STORAGE_KEY = 'seinfeld_sound_pattern';
-const PATTERN_QUEUE_STORAGE_KEY = 'seinfeld_sound_pattern_queue';
+// v2 — per-habit map of queue arrays; values are arrays of {pattern, scale}
+// objects (scale may be null = "use global default at play time").
+const PATTERN_QUEUES_STORAGE_KEY = 'seinfeld_sound_pattern_queues_v2';
 const VALID_IDS = new Set(SCALES.map(s => s.id));
 const VALID_PATTERN_IDS = new Set(PATTERNS.map(p => p.id));
 const MIN_OCTAVE = -4;   // wider downward range so low scales can rumble
@@ -478,42 +483,71 @@ export function setSelectedPatternId(id) {
 export function getCurrentPattern() {
   return PATTERNS.find(p => p.id === getSelectedPatternId()) || PATTERNS[0];
 }
-// Pattern queue: an ordered list of pattern IDs that the chain cycles
-// through. When non-empty, freqAt routes each PATTERN_QUEUE_SECTION-wide
-// stretch of cells to the next pattern in the queue (then wraps around).
-export function getPatternQueue() {
+// Per-habit pattern queue: each habit owns an ordered list of
+// {pattern, scale} entries; the chain cycles through them, with each
+// entry playing for PATTERN_QUEUE_SECTION cells before the next takes
+// over (looping when exhausted). `scale: null` on an entry means "use
+// whatever the global scale selection is at play time".
+function readQueuesMap() {
   try {
-    const raw = localStorage.getItem(PATTERN_QUEUE_STORAGE_KEY);
-    if (!raw) return [];
-    const ids = JSON.parse(raw);
-    if (!Array.isArray(ids)) return [];
-    return ids.filter(id => VALID_PATTERN_IDS.has(id)).slice(0, MAX_PATTERN_QUEUE);
-  } catch {
-    return [];
-  }
+    const raw = localStorage.getItem(PATTERN_QUEUES_STORAGE_KEY);
+    if (!raw) return {};
+    const obj = JSON.parse(raw);
+    return (obj && typeof obj === 'object' && !Array.isArray(obj)) ? obj : {};
+  } catch { return {}; }
 }
-export function setPatternQueue(ids) {
-  const clean = (Array.isArray(ids) ? ids : [])
-    .filter(id => VALID_PATTERN_IDS.has(id))
+function writeQueuesMap(map) {
+  localStorage.setItem(PATTERN_QUEUES_STORAGE_KEY, JSON.stringify(map));
+}
+// Normalize a queue entry into the canonical {pattern, scale} shape.
+// Accepts bare strings (legacy v1 format) as {pattern: x, scale: null}.
+function normalizeQueueEntry(item) {
+  if (typeof item === 'string') {
+    return VALID_PATTERN_IDS.has(item) ? { pattern: item, scale: null } : null;
+  }
+  if (!item || typeof item !== 'object') return null;
+  if (!VALID_PATTERN_IDS.has(item.pattern)) return null;
+  const scale = (item.scale && VALID_IDS.has(item.scale)) ? item.scale : null;
+  return { pattern: item.pattern, scale };
+}
+export function getPatternQueue(habitId) {
+  if (!habitId) return [];
+  const map = readQueuesMap();
+  const items = map[habitId];
+  if (!Array.isArray(items)) return [];
+  return items.map(normalizeQueueEntry).filter(Boolean).slice(0, MAX_PATTERN_QUEUE);
+}
+export function setPatternQueue(habitId, items) {
+  if (!habitId) return [];
+  const clean = (Array.isArray(items) ? items : [])
+    .map(normalizeQueueEntry)
+    .filter(Boolean)
     .slice(0, MAX_PATTERN_QUEUE);
-  localStorage.setItem(PATTERN_QUEUE_STORAGE_KEY, JSON.stringify(clean));
+  const map = readQueuesMap();
+  if (clean.length === 0) delete map[habitId];
+  else map[habitId] = clean;
+  writeQueuesMap(map);
   return clean;
 }
-export function addToPatternQueue(id) {
-  if (!VALID_PATTERN_IDS.has(id)) return getPatternQueue();
-  const q = getPatternQueue();
+export function addToPatternQueue(habitId, entry) {
+  const e = normalizeQueueEntry(entry);
+  if (!habitId || !e) return getPatternQueue(habitId);
+  const q = getPatternQueue(habitId);
   if (q.length >= MAX_PATTERN_QUEUE) return q;
-  q.push(id);
-  return setPatternQueue(q);
+  q.push(e);
+  return setPatternQueue(habitId, q);
 }
-export function removeFromPatternQueue(index) {
-  const q = getPatternQueue();
+export function removeFromPatternQueue(habitId, index) {
+  const q = getPatternQueue(habitId);
   if (index < 0 || index >= q.length) return q;
   q.splice(index, 1);
-  return setPatternQueue(q);
+  return setPatternQueue(habitId, q);
 }
-export function clearPatternQueue() {
-  localStorage.removeItem(PATTERN_QUEUE_STORAGE_KEY);
+export function clearPatternQueue(habitId) {
+  if (!habitId) return [];
+  const map = readQueuesMap();
+  delete map[habitId];
+  writeQueuesMap(map);
   return [];
 }
 export function getCurrentScale() {
@@ -605,83 +639,84 @@ function maxOctaveWrapForScale(scale) {
   _maxWrapCache.set(scale, max);
   return max;
 }
-// Picks which pattern fires for a given cell index, and the local index to
-// feed it. With an empty queue, the single pattern selection handles every
-// cell (and gets the global i so its internal cycle climb / wrap math
-// works). With a non-empty queue, the chain is sliced into
-// PATTERN_QUEUE_SECTION-wide sections; each section plays one queued
-// pattern from its start (local index 0..section-1), then the next.
-function patternForCell(i) {
-  const q = getPatternQueue();
-  if (q.length === 0) return { pattern: getCurrentPattern(), localI: i };
+// Resolves (scale, pattern, localI) for a cell index given a habit context.
+// Empty queue OR no habit context → use the global selection (current
+// scale, current single pattern), and feed the pattern the full global
+// index so its internal cycle climb / wrap math still works. With a
+// non-empty queue, the chain is sliced into PATTERN_QUEUE_SECTION-wide
+// sections; each section uses the next queue entry's pattern AND scale,
+// fed a fresh localI starting at 0.
+function audioContextForCell(i, habitId) {
+  const q = habitId ? getPatternQueue(habitId) : [];
+  if (q.length === 0) {
+    return { scale: getCurrentScale(), pattern: getCurrentPattern(), localI: i };
+  }
   const sectionIdx = Math.floor(i / PATTERN_QUEUE_SECTION) % q.length;
-  const pattern = PATTERNS.find(p => p.id === q[sectionIdx]) || PATTERNS[0];
-  return { pattern, localI: i % PATTERN_QUEUE_SECTION };
+  const entry = q[sectionIdx];
+  const pattern = PATTERNS.find(p => p.id === entry.pattern) || PATTERNS[0];
+  const scale = (entry.scale ? SCALES.find(s => s.id === entry.scale) : null) || getCurrentScale();
+  return { scale, pattern, localI: i % PATTERN_QUEUE_SECTION };
 }
-function freqAt(scale, index) {
+// Turns a (scale, pattern, localI) into a concrete frequency, applying the
+// auto-octave wrap + user's octave + pitch shifters.
+function freqAtWith(scale, pattern, localI) {
   const notes = scale.notes;
-  const i = Math.max(0, index);
-  // Patterns remap the (local) cell index into a virtual ascending step
-  // number. The wrap and shift math below then treats that step as if it
-  // came from a plain ascending sequence, so octave climb still works for
-  // any pattern regardless of whether it ran solo or as part of a queue.
-  const { pattern, localI } = patternForCell(i);
   const step = Math.max(0, pattern.step(localI, notes.length));
   const octaveWrap = Math.min(Math.floor(step / notes.length), maxOctaveWrapForScale(scale));
   const noteInOctave = step % notes.length;
-  // Combined shift: chain auto-wrap + user's octave slider + pitch slider
-  // (semitones converted to a fractional octave).
   const totalOctaves = octaveWrap + getOctaveShift() + getPitchShift() / 12;
   return notes[noteInOctave] * Math.pow(2, totalOctaves);
 }
 export function playNoteAt(index, opts = {}) {
-  const scale = getCurrentScale();
-  if (!scale || !scale.notes) return;
   const i = Math.max(0, index);
+  const { gain = 0.4 + Math.min(i, 20) * 0.008, habitId = null } = opts;
+  const { scale, pattern, localI } = audioContextForCell(i, habitId);
+  if (!scale || !scale.notes) return;
   const synth = scale.synth || {};
-  const { gain = 0.4 + Math.min(i, 20) * 0.008 } = opts;
-  playMalletNote(freqAt(scale, i), { ...synth, gain });
+  playMalletNote(freqAtWith(scale, pattern, localI), { ...synth, gain });
 }
 
-// All cells pulse simultaneously — play a brief stacked-note chord.
-export function playChord(count) {
-  const scale = getCurrentScale();
-  if (!scale || !scale.notes) return;
-  const synth = scale.synth || {};
-  const n = Math.min(count, scale.notes.length);
+// All cells pulse simultaneously — play a brief stacked-note chord. With a
+// queue, each "voice" of the chord can come from a different (scale,
+// pattern) section, so the chord is per-cell-context too.
+export function playChord(count, habitId = null) {
+  const n = Math.max(1, count);
   for (let i = 0; i < n; i++) {
-    playMalletNote(freqAt(scale, i), { ...synth, gain: 0.42 / Math.sqrt(n) });
+    const { scale, pattern, localI } = audioContextForCell(i, habitId);
+    if (!scale || !scale.notes) continue;
+    const synth = scale.synth || {};
+    playMalletNote(freqAtWith(scale, pattern, localI), {
+      ...synth, gain: 0.42 / Math.sqrt(n),
+    });
   }
 }
 
 // Single bright impact note (for shockwave / fireworks / starburst etc.)
-export function playBurst() {
-  const scale = getCurrentScale();
+export function playBurst(habitId = null) {
+  const focus = 5; // bright-ish position in the queue/pattern
+  const { scale, pattern, localI } = audioContextForCell(focus, habitId);
   if (!scale || !scale.notes) return;
   const synth = scale.synth || {};
-  playMalletNote(freqAt(scale, Math.min(5, scale.notes.length - 1)), { ...synth, gain: 0.65 });
+  const safeLocal = Math.min(localI, scale.notes.length - 1);
+  playMalletNote(freqAtWith(scale, pattern, safeLocal), { ...synth, gain: 0.65 });
 }
 
 // Simulator-style preview: play a full chain of `length` notes using the
-// given scale at the same per-step timing the chain animation would use.
-// Lets the sound-picker simulator show what a streak of N actually sounds
-// like with each scale.
-export function playSimulation(scaleId, length) {
-  const scale = SCALES.find(s => s.id === scaleId);
-  if (!scale || !scale.notes) return;
+// queue + scale resolution as if it were a real chain of that habit (or
+// the global default if no habit context is provided). Timing mirrors the
+// chain animation's adaptiveStep.
+export function playSimulation(length, habitId = null) {
   const c = ensureCtx();
   if (!c) return;
-  const n = Math.max(1, Math.min(length, 200));
-  // Mirror adaptiveStep from chainAnimations.js so the preview's timing
-  // matches the real cascade.
+  const n = Math.max(1, Math.min(length, MAX_PATTERN_QUEUE));
   const stepMs = n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n));
-  const synth = scale.synth || {};
   const startSec = c.currentTime;
   for (let i = 0; i < n; i++) {
+    const { scale, pattern, localI } = audioContextForCell(i, habitId);
+    if (!scale || !scale.notes) continue;
+    const synth = scale.synth || {};
     const gain = 0.4 + Math.min(i, 20) * 0.008;
-    // Schedule via Web Audio's `when` for sample-accurate pacing in the
-    // preview (no DOM cells to keep in sync with).
-    playMalletNote(freqAt(scale, i), {
+    playMalletNote(freqAtWith(scale, pattern, localI), {
       ...synth,
       gain,
       when: (startSec - c.currentTime) + (i * stepMs) / 1000,

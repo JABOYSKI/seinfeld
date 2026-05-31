@@ -252,7 +252,11 @@ function renderShell() {
   });
   const soundBtn = document.getElementById('soundBtn');
   soundBtn.addEventListener('click', () => {
-    openSoundPicker((id) => {
+    // Pass the current habit list + which habit is active so the picker can
+    // render the per-habit queue editor tabs. ALL_VIEW_ID isn't a real
+    // habit; in that case let the picker default to the first habit.
+    const targetHabitId = state.currentHabitId === ALL_VIEW_ID ? null : state.currentHabitId;
+    openSoundPicker(state.habits, targetHabitId, (id) => {
       soundBtn.textContent = id === 'off' ? '🔇' : '🔊';
       soundBtn.classList.toggle('is-active', id !== 'off');
       toast(`Sound: ${id}`, 'info');
