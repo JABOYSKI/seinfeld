@@ -1279,6 +1279,61 @@ button { font: inherit; color: inherit; }
   height: 22px;
   display: block;
 }
+
+/* Sparkline pattern dropdown (custom <details> "select" — native selects
+   can't hold SVG). Used in the main picker and the per-chip editor. The list
+   expands inline (not absolutely positioned) so it can't be clipped by the
+   chip editor's overflow; it caps its own height and scrolls. */
+.pat-dd { width: 100%; flex: 1; min-width: 0; }
+.ce-dd-slot { grid-column: 2 / 4; }
+.pat-dd-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 9px;
+}
+.pat-dd-summary::-webkit-details-marker { display: none; }
+.pat-dd-summary .pattern-option-name { flex: 0 0 auto; font-weight: 700; font-size: 12px; }
+.pat-dd-summary .pattern-spark { flex: 1; min-width: 40px; opacity: 0.6; }
+.pat-dd-caret { flex: 0 0 auto; color: var(--text-faint); font-size: 10px; }
+.pat-dd[open] > .pat-dd-summary { border-color: var(--accent); }
+.pat-dd-list {
+  margin-top: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 5px;
+}
+.pat-dd-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 5px 8px;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-family: inherit;
+  text-align: left;
+  transition: background 120ms, color 120ms;
+}
+.pat-dd-option:hover { background: var(--border-light); color: var(--text); }
+.pat-dd-option .pattern-option-name { flex: 0 0 84px; }
+.pat-dd-option .pattern-spark { flex: 1; min-width: 0; opacity: 0.6; }
 .sound-tile {
   flex-direction: row;
   align-items: center;

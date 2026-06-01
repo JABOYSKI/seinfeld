@@ -59,12 +59,8 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
           <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
           <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
         </div>
-        <label class="sim-label" for="simPattern">Pattern (used to preview sounds)</label>
-        <div class="sim-row">
-          <select id="simPattern" class="sim-select">
-            ${PATTERNS.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('')}
-          </select>
-        </div>
+        <label class="sim-label">Pattern (used to preview sounds)</label>
+        <div class="sim-row" id="simPatternSlot"></div>
 
         <label class="sim-label">
           Queue for
@@ -122,10 +118,8 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
           <button type="button" class="ce-close" id="ceClose" aria-label="Close">×</button>
         </div>
         <div class="ce-row">
-          <label for="cePattern">Pattern</label>
-          <select id="cePattern" class="ce-select">
-            ${PATTERNS.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('')}
-          </select>
+          <label>Pattern</label>
+          <span id="cePatternSlot" class="ce-dd-slot"></span>
         </div>
         <div class="ce-row">
           <label for="ceScale">Sound</label>
@@ -182,7 +176,6 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   const simOctaveValue = overlay.querySelector('#simOctaveValue');
   const simPitch = overlay.querySelector('#simPitch');
   const simPitchValue = overlay.querySelector('#simPitchValue');
-  const simPattern = overlay.querySelector('#simPattern');
   const queueBar = overlay.querySelector('#patternQueueBar');
   const queueCount = overlay.querySelector('#queueCount');
   const queueHabitTabs = overlay.querySelector('#queueHabitTabs');
@@ -269,11 +262,14 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   const previewSound = () => {
     playPatternPreview(getSelectedPatternId(), getSelectedSoundId(), 16);
   };
-  simPattern.value = getSelectedPatternId();
-  simPattern.addEventListener('change', () => {
-    setSelectedPatternId(simPattern.value);
+  // Pattern picker shown as a sparkline dropdown (native <select> can't hold
+  // the dot-matrix SVG). Selecting a pattern sets the global preview pattern
+  // and re-auditions the current sound with it.
+  const simPatternDD = buildPatternDropdown(getSelectedPatternId(), (id) => {
+    setSelectedPatternId(id);
     previewSound();
   });
+  overlay.querySelector('#simPatternSlot').appendChild(simPatternDD.el);
 
   const renderHabitTabs = () => {
     if (realHabits.length === 0) {
@@ -503,7 +499,6 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   const ceReset = overlay.querySelector('#ceReset');
   const ceDone = overlay.querySelector('#ceDone');
   const ceClose = overlay.querySelector('#ceClose');
-  const cePattern = overlay.querySelector('#cePattern');
   const ceScale = overlay.querySelector('#ceScale');
   let editingChipIndex = -1;
 
@@ -543,7 +538,7 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     const s = entry.scale ? SCALES.find(x => x.id === entry.scale) : null;
     ceStepNum.textContent = String(idx + 1);
     ceMeta.textContent = `${p ? p.name : '?'} · ${s ? s.name : 'default'}`;
-    cePattern.value = entry.pattern;
+    cePatternDD.value = entry.pattern;
     ceScale.value = entry.scale || '';
     ceOctave.value = (typeof entry.octaveShift === 'number') ? entry.octaveShift : getOctaveShift();
     cePitch.value = (typeof entry.pitchShift === 'number') ? entry.pitchShift : getPitchShift();
@@ -590,16 +585,18 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     applyChipChange({ sectionLength: v });
   });
   // Change this step's pattern / sound in place. The chip relabels + the queue
-  // re-previews so the edit is immediately audible.
+  // re-previews so the edit is immediately audible. Pattern uses the same
+  // sparkline dropdown as the main window.
+  const cePatternDD = buildPatternDropdown(getSelectedPatternId(), (id) => {
+    applyChipChange({ pattern: id });
+    refreshCeMeta();
+  });
+  overlay.querySelector('#cePatternSlot').appendChild(cePatternDD.el);
   const refreshCeMeta = () => {
-    const p = PATTERNS.find(x => x.id === cePattern.value);
+    const p = PATTERNS.find(x => x.id === cePatternDD.value);
     const s = ceScale.value ? SCALES.find(x => x.id === ceScale.value) : null;
     ceMeta.textContent = `${p ? p.name : '?'} · ${s ? s.name : 'default'}`;
   };
-  cePattern.addEventListener('change', () => {
-    applyChipChange({ pattern: cePattern.value });
-    refreshCeMeta();
-  });
   ceScale.addEventListener('change', () => {
     applyChipChange({ scale: ceScale.value || null });
     refreshCeMeta();
@@ -626,6 +623,13 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     if (chipEditor.contains(e.target)) return;
     if (e.target.closest('.pattern-queue-chip')) return;
     closeChipEditor();
+  });
+
+  // Close any open sparkline pattern dropdown when clicking outside it.
+  overlay.addEventListener('click', (e) => {
+    overlay.querySelectorAll('details.pat-dd[open]').forEach(dd => {
+      if (!dd.contains(e.target)) dd.open = false;
+    });
   });
 
   // ----- simulator + scales -----
@@ -657,7 +661,12 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   const onKey = (e) => {
-    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); }
+    if (e.key === 'Escape') {
+      // Escape closes an open pattern dropdown first, then the picker.
+      const openDD = overlay.querySelector('details.pat-dd[open]');
+      if (openDD) { openDD.open = false; return; }
+      close(); document.removeEventListener('keydown', onKey);
+    }
   };
   document.addEventListener('keydown', onKey);
 }
@@ -665,6 +674,55 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
 function formatSigned(v) {
   if (v === 0) return '0';
   return v > 0 ? `+${v}` : `${v}`;
+}
+
+// A pattern picker rendered as a <details> disclosure: the summary shows the
+// selected pattern (name + dot-matrix sparkline) and the list shows every
+// pattern with its sparkline, so you can choose by shape. A native <select>
+// can't hold the SVG, hence the custom control. Returns { el, value }.
+function buildPatternDropdown(initialId, onChange) {
+  const dd = document.createElement('details');
+  dd.className = 'pat-dd';
+  const summary = document.createElement('summary');
+  summary.className = 'pat-dd-summary';
+  summary.setAttribute('aria-label', 'Pattern');
+  const list = document.createElement('div');
+  list.className = 'pat-dd-list';
+  list.setAttribute('role', 'listbox');
+  list.innerHTML = PATTERNS.map(p => `
+    <button type="button" class="pat-dd-option" role="option" data-pattern="${p.id}" title="${escapeAttr(p.blurb)}">
+      <span class="pattern-option-name">${escapeHTML(p.name)}</span>
+      ${patternSparkline(p)}
+    </button>`).join('');
+  dd.appendChild(summary);
+  dd.appendChild(list);
+
+  let current = initialId;
+  const renderSummary = () => {
+    const p = PATTERNS.find(x => x.id === current) || PATTERNS[0];
+    summary.innerHTML =
+      `<span class="pattern-option-name">${escapeHTML(p.name)}</span>` +
+      patternSparkline(p) +
+      `<span class="pat-dd-caret" aria-hidden="true">▾</span>`;
+  };
+  renderSummary();
+
+  list.querySelectorAll('.pat-dd-option').forEach(opt => {
+    opt.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      current = opt.dataset.pattern;
+      renderSummary();
+      dd.open = false;
+      if (onChange) onChange(current);
+    });
+  });
+
+  return {
+    el: dd,
+    get value() { return current; },
+    set value(v) { current = v; renderSummary(); },
+  };
 }
 
 function escapeHTML(s) {
