@@ -32,12 +32,6 @@ function isSoundOff() {
   const v = localStorage.getItem('seinfeld_sound_scale');
   return !v || v === 'off';
 }
-// Global tempo multiplier, read straight from localStorage (audio.js is
-// lazy-loaded, so we avoid importing it here — mirrors audio.js getSpeedFactor).
-function speedFactor() {
-  const v = parseFloat(localStorage.getItem('seinfeld_sound_speed'));
-  return (Number.isFinite(v) && v > 0) ? Math.min(4, Math.max(0.25, v)) : 1;
-}
 
 const MAX_HABITS = 5;
 
@@ -622,18 +616,10 @@ async function ensureStreakSetsLoaded() {
 // of a wall-of-sound chord, and so the visual pulses don't all collide on
 // the same anchor cell in the same frame.
 const SYMPHONY_STAGGER_MS = 70;
-// Mirrors the default cascade's per-step rate (65 ms, now a CONSTANT tempo
-// scaled only by the speed slider — no length compression). We recompute it
-// here so the button's beat tracks the principal chain's cell pulses. (Beat
-// sync is exact for the default 'cascade' animation; other animations use a
-// different base step, so their button beat is approximate — pre-existing.)
-const SYMPHONY_BASE_STEP_MS = 65;
 const SYMPHONY_FINAL_PULSE_MS = 460;
-function symphonyStepFor(cellCount) {
-  // Constant tempo (no length-based compression) so the button beat stays in
-  // sync with the now-constant-rate cascade; the speed slider sets the pace.
-  return Math.max(2, Math.round(SYMPHONY_BASE_STEP_MS / speedFactor()));
-}
+// The per-step beat is no longer computed here: it comes from the SELECTED
+// chain animation's own base step (chainStepMsFor in chainAnimations.js), so
+// the button beat tracks whatever animation is playing — not just the default.
 
 async function playSymphony(btn) {
   if (!state.habits.length) { toast('No habits yet — create one first.', 'info'); return; }
@@ -667,19 +653,23 @@ async function playSymphony(btn) {
   // Also: the button's beat tracks this principal (the longest) cadence.
   playable.sort((a, b) => b.streak - a.streak);
 
-  const withTiming = playable.map((p, i) => {
-    const stepMs = symphonyStepFor(p.streak);
-    return {
-      ...p,
-      cells: p.streak,
-      stepMs,
-      startAt: i * SYMPHONY_STAGGER_MS,
-      dur: (p.streak - 1) * stepMs + SYMPHONY_FINAL_PULSE_MS,
-    };
-  });
+  // Lazy-load the chain-animation graph, then beat the button at the SELECTED
+  // animation's own per-step cadence (each animation has its own base step), so
+  // the flash tracks the cells for any animation — not just the default. With
+  // constant tempo the step is the same for every chain, so compute it once.
+  const chainMod = await lazyChainAnim();
+  const playChainAnimationDirect = chainMod.playChainAnimation;
+  const stepMs = chainMod.chainStepMsFor(chainMod.getSelectedChainAnimationId());
 
-  // Kick the chains (lazy-load the chain-animation graph on first use).
-  const { playChainAnimation: playChainAnimationDirect } = await lazyChainAnim();
+  const withTiming = playable.map((p, i) => ({
+    ...p,
+    cells: p.streak,
+    stepMs,
+    startAt: i * SYMPHONY_STAGGER_MS,
+    dur: (p.streak - 1) * stepMs + SYMPHONY_FINAL_PULSE_MS,
+  }));
+
+  // Kick the chains.
   for (const p of withTiming) {
     setTimeout(() => {
       playChainAnimationDirect(els.calendar, p.cells, p.habit, p.anchor, p.set);

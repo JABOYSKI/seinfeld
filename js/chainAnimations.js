@@ -157,6 +157,23 @@ function adaptiveStep(baseMs, count) {
   return Math.max(2, Math.round(baseMs / getSpeedFactor()));
 }
 
+// Each cascade animation's base per-step delay (ms at 1x). MIRRORS the
+// adaptiveStep(<base>, ...) literal inside each player below — keep in sync.
+// Animations not listed (surge/heartbeat/breathe + the radial bursts) have no
+// per-cell cascade, so they fall back to the default for beat-timing only.
+const CHAIN_BASE_STEP = {
+  cascade: 65, backwash: 65, wave: 80, 'edge-in': 75, 'center-out': 75,
+  'glow-trail': 65, 'ripple-trail': 65, 'shimmer-row': 55, dominos: 75,
+  flicker: 40, bloom: 50, echo: 70, stack: 80, 'streak-fire': 50,
+};
+const DEFAULT_BASE_STEP = 65;
+// Speed-adjusted per-step ms for a given animation id. The Symphony button uses
+// this so its beat tracks the SELECTED animation's actual cadence instead of
+// assuming the default 65 ms.
+export function chainStepMsFor(id) {
+  return adaptiveStep(CHAIN_BASE_STEP[id] || DEFAULT_BASE_STEP, 0);
+}
+
 function floaterSize(streak) {
   if (streak < 7)  return 16;
   if (streak < 14) return 22;
