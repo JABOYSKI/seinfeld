@@ -708,12 +708,17 @@ function defaultAudioContext(i) {
     pitchShift: getPitchShift(),
   };
 }
-function resolveEntry(entry, localI) {
+function resolveEntry(entry, localI, globalI) {
   const pattern = PATTERNS.find(p => p.id === entry.pattern) || PATTERNS[0];
   const scale = (entry.scale ? SCALES.find(s => s.id === entry.scale) : null) || getCurrentScale();
   const octaveShift = (typeof entry.octaveShift === 'number') ? entry.octaveShift : getOctaveShift();
   const pitchShift = (typeof entry.pitchShift === 'number') ? entry.pitchShift : getPitchShift();
-  return { scale, pattern, localI, octaveShift, pitchShift };
+  // 'base' plays the sound straight through: a continuous ascending run across
+  // the whole chain (exactly like the sound preview), instead of restarting at
+  // the section boundary the way the motif patterns do. So it uses the global
+  // cell index, not the per-section position.
+  const idx = entry.pattern === 'base' ? globalI : localI;
+  return { scale, pattern, localI: idx, octaveShift, pitchShift };
 }
 function audioContextForCell(i, habitId) {
   const q = habitId ? getPatternQueue(habitId) : [];
@@ -723,7 +728,7 @@ function audioContextForCell(i, habitId) {
   let pos = ((i % totalCells) + totalCells) % totalCells;
   for (const entry of q) {
     const len = entry.sectionLength || PATTERN_QUEUE_SECTION;
-    if (pos < len) return resolveEntry(entry, pos);
+    if (pos < len) return resolveEntry(entry, pos, i);
     pos -= len;
   }
   return defaultAudioContext(i); // unreachable in practice
