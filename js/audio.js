@@ -725,10 +725,17 @@ function audioContextForCell(i, habitId) {
   if (q.length === 0) return defaultAudioContext(i);
   const totalCells = q.reduce((sum, e) => sum + (e.sectionLength || PATTERN_QUEUE_SECTION), 0);
   if (totalCells === 0) return defaultAudioContext(i);
+  const cycles = Math.floor(i / totalCells);
   let pos = ((i % totalCells) + totalCells) % totalCells;
   for (const entry of q) {
     const len = entry.sectionLength || PATTERN_QUEUE_SECTION;
-    if (pos < len) return resolveEntry(entry, pos, i);
+    if (pos < len) {
+      // 3rd arg = this entry's OWN cumulative index. For 'base' it ascends
+      // continuously from 0 across the entry's sections, so the sound plays its
+      // full innate progression from the bottom (matching the click-preview)
+      // no matter where the entry sits in the queue. Other patterns ignore it.
+      return resolveEntry(entry, pos, cycles * len + pos);
+    }
     pos -= len;
   }
   return defaultAudioContext(i); // unreachable in practice
