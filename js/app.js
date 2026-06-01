@@ -11,13 +11,27 @@ import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
 import { toast, todayISO, daysAgoISO, canEditDay, prefersReducedMotion } from './utils.js';
 import { getSelectedAnimationId, FILL_ANIMATION_DURATION_MS } from './fillAnimations.js';
 import { openAnimationPicker } from './animationPicker.js';
-import { openChainPicker } from './chainPicker.js';
-import { openSoundPicker } from './soundPicker.js';
-import { getSelectedSoundId } from './audio.js';
-import { playChainAnimation } from './chainBuild.js';
-// Direct (no 350 ms fill-buffer + milestone-toast wrapper) — used by the
-// symphony button to fire many chains in a tight orchestral stagger.
-import { playChainAnimation as playChainAnimationDirect } from './chainAnimations.js';
+
+// The audio synth + chain-animation + sound-picker graph (~2,600 lines, incl.
+// the ~800-line audio.js) is only needed AFTER first paint — on a day-tick,
+// the Symphony, or when a picker opens. Importing it statically would block
+// the calendar's first paint on parsing all of it, so it's loaded on demand
+// (the promise is cached) and prefetched once the browser is idle. The
+// chainBuild graph pulls in chainAnimations -> audio, so warming it covers the
+// whole tick/symphony path. (animationPicker + fillAnimations stay static —
+// they're light leaves with no audio dependency.)
+let _chainBuildP = null, _chainAnimP = null;
+const lazyChainBuild = () => (_chainBuildP || (_chainBuildP = import('./chainBuild.js')));
+const lazyChainAnim  = () => (_chainAnimP  || (_chainAnimP  = import('./chainAnimations.js')));
+
+// Sound on/off for the header icon, read straight from localStorage so the
+// header doesn't drag in audio.js at module-eval. Mirrors
+// getSelectedSoundId() === 'off' (the stored value is always a validated
+// scale id; absent or 'off' = muted).
+function isSoundOff() {
+  const v = localStorage.getItem('seinfeld_sound_scale');
+  return !v || v === 'off';
+}
 
 const MAX_HABITS = 5;
 
@@ -207,7 +221,7 @@ function renderShell() {
         <div class="header-spacer"></div>
         <button class="icon-btn" id="animBtn" title="Choose fill animation" aria-label="Choose fill animation">✦</button>
         <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation" aria-label="Choose chain animation">⛓</button>
-        <button class="icon-btn ${getSelectedSoundId() !== 'off' ? 'is-active' : ''}" id="soundBtn" title="Choose chain sound" aria-label="Choose chain sound">${getSelectedSoundId() === 'off' ? '🔇' : '🔊'}</button>
+        <button class="icon-btn ${!isSoundOff() ? 'is-active' : ''}" id="soundBtn" title="Choose chain sound" aria-label="Choose chain sound">${isSoundOff() ? '🔇' : '🔊'}</button>
         <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view" aria-label="Toggle continuous / months view">${viewToggleIcon()}</button>
         <button class="icon-btn ${getShowWeekNumbers() ? 'is-active' : ''}" id="weekNumBtn" title="Toggle week numbers (continuous view)" aria-label="Toggle week numbers">#</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
@@ -255,15 +269,17 @@ function renderShell() {
   document.getElementById('animBtn').addEventListener('click', () => {
     openAnimationPicker((id) => toast(`Fill: ${id}`, 'info'));
   });
-  document.getElementById('chainAnimBtn').addEventListener('click', () => {
+  document.getElementById('chainAnimBtn').addEventListener('click', async () => {
+    const { openChainPicker } = await import('./chainPicker.js');
     openChainPicker((id) => toast(`Chain: ${id}`, 'info'));
   });
   const soundBtn = document.getElementById('soundBtn');
-  soundBtn.addEventListener('click', () => {
+  soundBtn.addEventListener('click', async () => {
     // Pass the current habit list + which habit is active so the picker can
     // render the per-habit queue editor tabs. ALL_VIEW_ID isn't a real
     // habit; in that case let the picker default to the first habit.
     const targetHabitId = state.currentHabitId === ALL_VIEW_ID ? null : state.currentHabitId;
+    const { openSoundPicker } = await import('./soundPicker.js');
     openSoundPicker(state.habits, targetHabitId, (id) => {
       soundBtn.textContent = id === 'off' ? '🔇' : '🔊';
       soundBtn.classList.toggle('is-active', id !== 'off');
@@ -297,6 +313,16 @@ function renderShell() {
   });
   els.calendar.addEventListener('click', onCalendarClick);
   document.getElementById('emptyCreate').addEventListener('click', () => openHabitDialog());
+
+  // Warm the lazy delight graph once the browser is idle, so the first
+  // day-tick celebration / Symphony doesn't wait on a network fetch. Pure
+  // prefetch off the critical path — failures are ignored. (Wrapped so
+  // requestIdleCallback keeps its window receiver — calling it detached
+  // throws "Illegal invocation" in some engines.)
+  const ric = window.requestIdleCallback
+    ? (cb) => window.requestIdleCallback(cb)
+    : (cb) => setTimeout(cb, 1200);
+  ric(() => { lazyChainBuild().catch(() => {}); });
 }
 
 async function loadAndRenderHabits() {
@@ -638,7 +664,8 @@ async function playSymphony(btn) {
     };
   });
 
-  // Kick the chains
+  // Kick the chains (lazy-load the chain-animation graph on first use).
+  const { playChainAnimation: playChainAnimationDirect } = await lazyChainAnim();
   for (const p of withTiming) {
     setTimeout(() => {
       playChainAnimationDirect(els.calendar, p.cells, p.habit, p.anchor, p.set);
@@ -778,6 +805,7 @@ async function onCalendarClick(e) {
       // The old behavior anchored on today, which felt wrong when filling
       // yesterday with today still empty. The animation skips any chain cells
       // that fall outside the loaded grid (e.g. a streak reaching last year).
+      const { playChainAnimation } = await lazyChainBuild();
       playChainAnimation(els.calendar, newStreak, habit, day, state.completions);
     }
   }

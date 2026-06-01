@@ -727,14 +727,21 @@ export function playNoteAt(index, opts = {}) {
 // All cells pulse simultaneously — play a brief stacked-note chord. With a
 // queue, each "voice" of the chord can come from a different (scale,
 // pattern) section, so the chord is per-cell-context too.
+//
+// Voices are capped: past ~2 dozen identical-onset oscillators the extra notes
+// are inaudible but cause clipping + a main-thread spike on long chains. This
+// is the all-at-once pulse only — the sequential cascade (playNoteAt) is
+// uncapped, so a 100-day chain still plays its full note-by-note run.
+const MAX_CHORD_VOICES = 24;
 export function playChord(count, habitId = null) {
   const n = Math.max(1, count);
-  for (let i = 0; i < n; i++) {
+  const voices = Math.min(n, MAX_CHORD_VOICES);
+  for (let i = 0; i < voices; i++) {
     const { scale, pattern, localI, octaveShift, pitchShift } = audioContextForCell(i, habitId);
     if (!scale || !scale.notes) continue;
     const synth = scale.synth || {};
     playMalletNote(freqAtWith(scale, pattern, localI, octaveShift, pitchShift), {
-      ...synth, gain: 0.42 / Math.sqrt(n),
+      ...synth, gain: 0.42 / Math.sqrt(voices),
     });
   }
 }
