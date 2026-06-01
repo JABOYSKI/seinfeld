@@ -1384,6 +1384,24 @@ button { font: inherit; color: inherit; }
   color: var(--text);
   text-align: right;
 }
+/* Pattern / Sound selectors span the control + value columns for full width. */
+.chip-editor .ce-select {
+  grid-column: 2 / 4;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip-editor .ce-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .chip-editor .ce-actions {
   display: flex;
   align-items: center;

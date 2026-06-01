@@ -115,6 +115,19 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
           <button type="button" class="ce-close" id="ceClose" aria-label="Close">×</button>
         </div>
         <div class="ce-row">
+          <label for="cePattern">Pattern</label>
+          <select id="cePattern" class="ce-select">
+            ${PATTERNS.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="ce-row">
+          <label for="ceScale">Sound</label>
+          <select id="ceScale" class="ce-select">
+            <option value="">Default (global)</option>
+            ${SCALES.map(s => `<option value="${s.id}">${escapeHTML(s.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="ce-row">
           <label for="ceOctave">Octave shift</label>
           <input type="range" id="ceOctave" min="${OCTAVE_RANGE.min}" max="${OCTAVE_RANGE.max}" step="1" value="0" />
           <span class="ce-value" id="ceOctaveValue">0</span>
@@ -470,6 +483,8 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   const ceReset = overlay.querySelector('#ceReset');
   const ceDone = overlay.querySelector('#ceDone');
   const ceClose = overlay.querySelector('#ceClose');
+  const cePattern = overlay.querySelector('#cePattern');
+  const ceScale = overlay.querySelector('#ceScale');
   let editingChipIndex = -1;
 
   const positionChipEditor = (anchorRect) => {
@@ -508,6 +523,8 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     const s = entry.scale ? SCALES.find(x => x.id === entry.scale) : null;
     ceStepNum.textContent = String(idx + 1);
     ceMeta.textContent = `${p ? p.name : '?'} · ${s ? s.name : 'default'}`;
+    cePattern.value = entry.pattern;
+    ceScale.value = entry.scale || '';
     ceOctave.value = (typeof entry.octaveShift === 'number') ? entry.octaveShift : getOctaveShift();
     cePitch.value = (typeof entry.pitchShift === 'number') ? entry.pitchShift : getPitchShift();
     ceTones.value = entry.sectionLength || PATTERN_QUEUE_SECTION;
@@ -551,6 +568,21 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     const v = parseInt(ceTones.value, 10);
     ceTonesValue.textContent = String(v);
     applyChipChange({ sectionLength: v });
+  });
+  // Change this step's pattern / sound in place. The chip relabels + the queue
+  // re-previews so the edit is immediately audible.
+  const refreshCeMeta = () => {
+    const p = PATTERNS.find(x => x.id === cePattern.value);
+    const s = ceScale.value ? SCALES.find(x => x.id === ceScale.value) : null;
+    ceMeta.textContent = `${p ? p.name : '?'} · ${s ? s.name : 'default'}`;
+  };
+  cePattern.addEventListener('change', () => {
+    applyChipChange({ pattern: cePattern.value });
+    refreshCeMeta();
+  });
+  ceScale.addEventListener('change', () => {
+    applyChipChange({ scale: ceScale.value || null });
+    refreshCeMeta();
   });
   ceReset.addEventListener('click', (e) => {
     e.stopPropagation();

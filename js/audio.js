@@ -271,6 +271,12 @@ export const SCALES = [
 // chains naturally climbing in pitch regardless of which internal pattern
 // they use. Pattern #1 (ascending) is the original/default behavior.
 export const PATTERNS = [
+  // "Base" — the chosen sound played plainly, exactly as it auditions: a
+  // straight run through the scale's own notes (this IS the default traversal
+  // a bare sound previews with). Listed first so it reads as the "just this
+  // sound" choice. Behaviorally identical to Ascending by design.
+  { id: 'base',       name: 'Base',        blurb: 'The sound itself, as auditioned',
+    step: (i) => i },
   { id: 'ascending',  name: 'Ascending',   blurb: 'Up the scale (default)',
     step: (i) => i },
   { id: 'descending', name: 'Descending',  blurb: 'Down within each octave',
