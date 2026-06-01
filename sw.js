@@ -1,7 +1,7 @@
 // Service worker — app shell cache only.
 // Versioned cache name is stamped by deploy.bat on every deploy so browsers
 // pick up new assets without manual cache-clearing.
-const CACHE = 'seinfeld-2026-06-01T20:41:38Z';
+const CACHE = 'seinfeld-2026-06-01T20:53:45Z';
 const SHELL = [
   './',
   './index.html',
