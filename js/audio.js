@@ -790,7 +790,7 @@ export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SE
   const c = ensureCtx();
   if (!c) return;
   const n = Math.max(1, Math.min(length, 64));
-  const stepMs = Math.max(2, Math.round((n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n))) / getSpeedFactor()));
+  const stepMs = Math.max(2, Math.round(65 / getSpeedFactor()));
   const synth = scale.synth || {};
   const startSec = c.currentTime;
   const oct = getOctaveShift();
@@ -812,7 +812,7 @@ export function playSimulation(length, habitId = null) {
   const c = ensureCtx();
   if (!c) return;
   const n = Math.max(1, Math.min(length, MAX_PATTERN_QUEUE));
-  const stepMs = Math.max(2, Math.round((n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n))) / getSpeedFactor()));
+  const stepMs = Math.max(2, Math.round(65 / getSpeedFactor()));
   const startSec = c.currentTime;
   for (let i = 0; i < n; i++) {
     const { scale, pattern, localI, octaveShift, pitchShift } = audioContextForCell(i, habitId);

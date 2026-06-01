@@ -143,20 +143,18 @@ function cascadeLengthForStreak(streak) {
   return streak < 2 ? 0 : streak - 1;
 }
 
-// Compresses the per-step delay as the chain grows so even huge chains
-// stay watchable. For chains up to 30, the base step is unchanged (each
-// animation keeps its original feel). Past that, step shrinks toward a
-// floor of ~4 ms — that's around the browser's setTimeout granularity.
-//
-//   30 cells   @ 65 ms  ~= 2 s cascade  (default)
-//   100 cells  @ 20 ms  ~= 2 s
-//   1000 cells @ 4  ms  ~= 4 s          (clamped at floor)
-//   10000 cells @ 4 ms ~= 40 s          (genuinely epic)
+// Per-step delay for the cascade. Held CONSTANT (no length-based compression)
+// so the chain plays at a steady pace regardless of how long it is — the speed
+// slider alone decides the tempo. A longer chain therefore takes proportionally
+// longer (e.g. at 1x, ~65 ms/cell: 100 cells ~= 6.5 s, 365 ~= 24 s); crank the
+// speed slider (up to 4x) to shorten very long cascades.
 function adaptiveStep(baseMs, count) {
-  const raw = count <= 30 ? baseMs : Math.max(4, Math.floor(30 * baseMs / count));
-  // Global tempo: >1 speeds the cascade up (shorter step), <1 slows it down.
-  // Both the visual pulse and its synced audio note ride this same step.
-  return Math.max(2, Math.round(raw / getSpeedFactor()));
+  // CONSTANT tempo: the per-step delay is baseMs scaled ONLY by the global
+  // speed factor. The chain no longer auto-accelerates as it grows — a longer
+  // chain just plays longer at the same pace, and the speed slider is the sole
+  // determinant of how fast it goes. (`count` is kept for the call signature
+  // but intentionally unused now.)
+  return Math.max(2, Math.round(baseMs / getSpeedFactor()));
 }
 
 function floaterSize(streak) {

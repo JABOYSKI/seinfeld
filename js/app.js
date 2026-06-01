@@ -622,19 +622,17 @@ async function ensureStreakSetsLoaded() {
 // of a wall-of-sound chord, and so the visual pulses don't all collide on
 // the same anchor cell in the same frame.
 const SYMPHONY_STAGGER_MS = 70;
-// Mirrors the per-step cascade rate used by chainAnimations.js's runSequence
-// (default 65 ms, compressed via adaptiveStep for very long chains). We
-// recompute it here so the button's beat lands on the same setTimeout cycles
-// as the visual cell pulse and the synced audio note — true sync, not an
-// independent approximation.
+// Mirrors the default cascade's per-step rate (65 ms, now a CONSTANT tempo
+// scaled only by the speed slider — no length compression). We recompute it
+// here so the button's beat tracks the principal chain's cell pulses. (Beat
+// sync is exact for the default 'cascade' animation; other animations use a
+// different base step, so their button beat is approximate — pre-existing.)
 const SYMPHONY_BASE_STEP_MS = 65;
 const SYMPHONY_FINAL_PULSE_MS = 460;
 function symphonyStepFor(cellCount) {
-  const raw = cellCount <= 30
-    ? SYMPHONY_BASE_STEP_MS
-    : Math.max(4, Math.floor(30 * SYMPHONY_BASE_STEP_MS / cellCount));
-  // Keep the button beat synced with the (speed-adjusted) cascade.
-  return Math.max(2, Math.round(raw / speedFactor()));
+  // Constant tempo (no length-based compression) so the button beat stays in
+  // sync with the now-constant-rate cascade; the speed slider sets the pace.
+  return Math.max(2, Math.round(SYMPHONY_BASE_STEP_MS / speedFactor()));
 }
 
 async function playSymphony(btn) {
