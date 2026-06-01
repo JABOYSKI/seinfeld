@@ -128,16 +128,17 @@ export async function createHabit(userId, name, color, texture = DEFAULT_TEXTURE
 export async function repairFutureCreatedDates(userId) {
   const today = todayISO();
   const all = await loadHabits(userId);
-  const broken = all.filter(h => h.created_at > today);
-  if (broken.length === 0) return 0;
-  for (const h of broken) {
-    await withTimeout(
-      supabase.from('habits').update({ created_at: today }).eq('id', h.id),
-      8000,
-      'repairFutureCreatedDates'
-    );
-  }
-  return broken.length;
+  const brokenIds = all.filter(h => h.created_at > today).map(h => h.id);
+  if (brokenIds.length === 0) return 0;
+  // One batched UPDATE ... WHERE id IN (...) instead of N serial round-trips,
+  // and surface a failure instead of silently swallowing it.
+  const { error } = await withTimeout(
+    supabase.from('habits').update({ created_at: today }).in('id', brokenIds),
+    8000,
+    'repairFutureCreatedDates'
+  );
+  if (error) throw error;
+  return brokenIds.length;
 }
 
 export async function updateHabit(id, fields) {

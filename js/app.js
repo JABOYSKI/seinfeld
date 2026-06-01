@@ -328,8 +328,16 @@ function renderShell() {
 async function loadAndRenderHabits() {
   const user = getUser();
   try {
-    const fixed = await repairFutureCreatedDates(user.id);
-    if (fixed > 0) toast(`Fixed ${fixed} habit start date${fixed > 1 ? 's' : ''}.`, 'info');
+    // Best-effort self-heal of future-dated created_at (UTC skew). It now
+    // batches into one UPDATE and throws on failure, so it gets its OWN
+    // try/catch — a transient repair timeout must not abort the whole habit
+    // load and leave the user staring at an empty wall.
+    try {
+      const fixed = await repairFutureCreatedDates(user.id);
+      if (fixed > 0) toast(`Fixed ${fixed} habit start date${fixed > 1 ? 's' : ''}.`, 'info');
+    } catch (e) {
+      console.warn('repairFutureCreatedDates failed (non-fatal):', e);
+    }
     state.habits = applyStoredHabitOrder(await loadHabits(user.id));
   } catch (e) {
     toast(`Failed to load habits: ${e.message}`, 'error');
@@ -1015,6 +1023,13 @@ function openHabitDialog(existing = null) {
       try {
         await deleteHabit(existing.id);
         state.habits = state.habits.filter(h => h.id !== existing.id);
+        // Drop now-orphaned per-habit state: the localStorage sound queue
+        // (lazy-import audio.js, since it's off the critical path) and the
+        // cached streak/completion maps keyed by this id.
+        import('./audio.js').then(m => m.clearPatternQueue(existing.id)).catch(() => {});
+        state.streakSetByHabit.delete(existing.id);
+        state.completionsByHabit.delete(existing.id);
+        if (state.streakSetHabitId === existing.id) state.streakSetHabitId = null;
         if (state.currentHabitId === existing.id) {
           state.currentHabitId = state.habits[0]?.id || null;
         }

@@ -13,7 +13,7 @@ create table if not exists public.habits (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
   name text not null,
-  color text not null,                            -- hex like '#e74c3c'
+  color text not null constraint habits_color_hex check (color ~ '^#[0-9a-fA-F]{6}$'),  -- hex like '#e74c3c'
   created_at date not null default current_date,  -- chain starts here
   sort_order int not null default 0,
   archived boolean not null default false
@@ -60,5 +60,16 @@ create policy "own profile" on public.users
 create policy "own habits" on public.habits
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- A completion is owned by the caller only when user_id matches AND the caller
+-- owns the referenced habit (closes a cross-habit write gap). See migration
+-- 004_hygiene.sql.
 create policy "own completions" on public.completions
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all
+  using (
+    auth.uid() = user_id
+    and exists (select 1 from public.habits h where h.id = completions.habit_id and h.user_id = auth.uid())
+  )
+  with check (
+    auth.uid() = user_id
+    and exists (select 1 from public.habits h where h.id = completions.habit_id and h.user_id = auth.uid())
+  );
