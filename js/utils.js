@@ -6,6 +6,9 @@ export function toast(msg, kind = 'info') {
   const host = document.getElementById('toastHost') || (() => {
     const el = document.createElement('div');
     el.id = 'toastHost';
+    // Announce toasts to assistive tech (errors/saves are otherwise silent).
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
     document.body.appendChild(el);
     return el;
   })();
@@ -29,6 +32,18 @@ export function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 export function escapeAttr(s) { return escapeHTML(s); }
+
+// --- Motion preference ----------------------------------------------------
+// Cached so the hot animation paths don't query matchMedia on every fire.
+// Wrapped in try/catch so importing this module in a non-DOM context (e.g. a
+// Node test of the pure date/streak helpers) doesn't throw.
+let _reduceMotion = false;
+try {
+  const mq = matchMedia('(prefers-reduced-motion: reduce)');
+  _reduceMotion = mq.matches;
+  mq.addEventListener('change', e => { _reduceMotion = e.matches; });
+} catch (e) { /* no matchMedia (SSR / Node) — default to motion allowed */ }
+export function prefersReducedMotion() { return _reduceMotion; }
 
 // --- Date helpers ---------------------------------------------------------
 // Everything is done in local time. ISO strings here are 'YYYY-MM-DD' (no

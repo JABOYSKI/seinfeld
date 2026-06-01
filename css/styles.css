@@ -498,7 +498,14 @@ button { font: inherit; color: inherit; }
   border-color: var(--habit-color);
   color: rgba(255,255,255,.92);
   font-weight: 700;
+  /* Non-color cue: an inset ring marks a filled cell by SHAPE, so "done vs
+     empty" survives grayscale / colorblindness (WCAG 1.4.1) instead of relying
+     on hue alone. Uses box-shadow (not ::after) to avoid clobbering the
+     pseudo-element that the sweep/iris/wipe fill animations paint with. */
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.45);
 }
+/* On light theme the fill can be pale, so a dark inset ring keeps contrast. */
+[data-theme="light"] .day-done { box-shadow: inset 0 0 0 2px rgba(0,0,0,.28); }
 .day-done:hover { filter: brightness(1.1); }
 
 /* Fill animations live in css/animations.css. JS adds a `.fill-<id>` class

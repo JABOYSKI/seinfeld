@@ -265,8 +265,19 @@ function renderDay(iso, dayNum, habit, completions, today, habitCreated) {
   else if (!editable && !done) title = `${iso} — can only backfill the last 3 days`;
   else if (!editable && done) title = `${iso} — locked (click to un-fill with confirmation)`;
 
-  return `<button type="button" class="${classes.join(' ')}" data-day="${iso}" title="${escapeAttr(title)}"${clickable ? '' : ' disabled'}>
-    <span class="day-num">${dayNum}</span>
+  // Accessible name: a human date + state word. For clickable cells the done
+  // state rides on aria-pressed (toggle semantics) so it isn't said twice.
+  const [yy, mm, dd] = iso.split('-');
+  const human = `${MONTH_SHORT[Number(mm) - 1]} ${Number(dd)}, ${yy}`;
+  const stateWord = done ? 'completed'
+    : future ? 'upcoming'
+    : preCreation ? 'before habit started'
+    : (!editable ? 'locked' : 'not completed');
+  const ariaLabel = clickable ? human : `${human}, ${stateWord}`;
+  const pressedAttr = clickable ? ` aria-pressed="${done}"` : '';
+
+  return `<button type="button" class="${classes.join(' ')}" data-day="${iso}" title="${escapeAttr(title)}" aria-label="${escapeAttr(ariaLabel)}"${pressedAttr}${clickable ? '' : ' disabled'}>
+    <span class="day-num" aria-hidden="true">${dayNum}</span>
   </button>`;
 }
 

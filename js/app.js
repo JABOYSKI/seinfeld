@@ -8,7 +8,7 @@ import { renderCalendar, renderAllCalendar, renderContinuousCalendar, renderCont
 import { currentStreak, longestStreak } from './streak.js';
 
 import { initTheme, toggleTheme, getActiveTheme } from './theme.js';
-import { toast, todayISO, daysAgoISO, canEditDay } from './utils.js';
+import { toast, todayISO, daysAgoISO, canEditDay, prefersReducedMotion } from './utils.js';
 import { getSelectedAnimationId, FILL_ANIMATION_DURATION_MS } from './fillAnimations.js';
 import { openAnimationPicker } from './animationPicker.js';
 import { openChainPicker } from './chainPicker.js';
@@ -205,12 +205,12 @@ function renderShell() {
           </svg>
         </button>
         <div class="header-spacer"></div>
-        <button class="icon-btn" id="animBtn" title="Choose fill animation">✦</button>
-        <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation">⛓</button>
-        <button class="icon-btn ${getSelectedSoundId() !== 'off' ? 'is-active' : ''}" id="soundBtn" title="Choose chain sound">${getSelectedSoundId() === 'off' ? '🔇' : '🔊'}</button>
-        <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view">${viewToggleIcon()}</button>
-        <button class="icon-btn ${getShowWeekNumbers() ? 'is-active' : ''}" id="weekNumBtn" title="Toggle week numbers (continuous view)">#</button>
-        <button class="icon-btn" id="themeBtn" title="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
+        <button class="icon-btn" id="animBtn" title="Choose fill animation" aria-label="Choose fill animation">✦</button>
+        <button class="icon-btn" id="chainAnimBtn" title="Choose chain animation" aria-label="Choose chain animation">⛓</button>
+        <button class="icon-btn ${getSelectedSoundId() !== 'off' ? 'is-active' : ''}" id="soundBtn" title="Choose chain sound" aria-label="Choose chain sound">${getSelectedSoundId() === 'off' ? '🔇' : '🔊'}</button>
+        <button class="icon-btn" id="viewToggle" title="Toggle continuous / months view" aria-label="Toggle continuous / months view">${viewToggleIcon()}</button>
+        <button class="icon-btn ${getShowWeekNumbers() ? 'is-active' : ''}" id="weekNumBtn" title="Toggle week numbers (continuous view)" aria-label="Toggle week numbers">#</button>
+        <button class="icon-btn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">${getActiveTheme() === 'dark' ? '☀️' : '🌙'}</button>
         <button class="icon-btn" id="signoutBtn" title="Sign out" aria-label="Sign out">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -228,7 +228,7 @@ function renderShell() {
         <div class="year-label" id="yearLabel">${state.currentYear}</div>
         <button class="icon-btn" id="yearNext" title="Next year">›</button>
         <div class="header-spacer"></div>
-        <div class="streak-chip" id="streakChip"></div>
+        <div class="streak-chip" id="streakChip" role="status" aria-live="polite" aria-label="Streak"></div>
       </div>
       <div class="calendar" id="calendar"></div>
       <div class="empty-state" id="emptyState" hidden>
@@ -334,8 +334,8 @@ function renderTabs() {
   const showAllTab = state.habits.length >= 2;
   const allTab = showAllTab
     ? `<button class="tab tab-all ${state.currentHabitId === ALL_VIEW_ID ? 'tab-active' : ''}"
-               data-habit="${ALL_VIEW_ID}" title="See every habit at once">
-         <span class="tab-all-icon">▦</span>
+               data-habit="${ALL_VIEW_ID}" title="See every habit at once" aria-label="All habits"${state.currentHabitId === ALL_VIEW_ID ? ' aria-current="true"' : ''}>
+         <span class="tab-all-icon" aria-hidden="true">▦</span>
          <span class="tab-name">All</span>
        </button>`
     : '';
@@ -345,8 +345,9 @@ function renderTabs() {
             data-habit="${h.id}"
             draggable="true"
             title="Drag to reorder"
+            aria-label="${escapeAttr(h.name)}"${h.id === state.currentHabitId ? ' aria-current="true"' : ''}
             style="--tab-color:${h.color};--tab-text-color:${h.text_color || '#ffffff'}">
-      <span class="tab-dot"></span>
+      <span class="tab-dot" aria-hidden="true"></span>
       <span class="tab-name">${escapeHTML(h.name)}</span>
       <span class="tab-edit" data-edit="${h.id}" title="Edit habit">✎</span>
     </button>
@@ -768,7 +769,10 @@ async function onCalendarClick(e) {
     cell.classList.add('day-done');
     playFillAnimation(cell);
     const newStreak = currentStreak(streakSrc, habit.created_at);
-    if (newStreak > oldStreak && newStreak >= 2) {
+    // Reduced-motion: suppress the auto chain cascade (and its coupled audio)
+    // on a routine tick. The explicit Symphony button + picker previews still
+    // animate, since those are deliberately user-invoked.
+    if (newStreak > oldStreak && newStreak >= 2 && !prefersReducedMotion()) {
       // Anchor on the cell that was just clicked — that's where the user's
       // attention is and (in their mental model) the new end of the chain.
       // The old behavior anchored on today, which felt wrong when filling
@@ -1004,6 +1008,9 @@ function escapeAttr(s) { return escapeHTML(s); }
 // so re-clicking restarts the keyframes; without the reflow, re-adding the
 // same class won't re-fire them.
 function playFillAnimation(cell) {
+  // Respect reduced-motion: the cell already carries the static `day-done`
+  // fill, so just skip the keyframe flourish + reflow on a routine tick.
+  if (prefersReducedMotion()) return;
   const id = getSelectedAnimationId();
   const cls = `fill-${id}`;
   cell.classList.remove(cls, 'day-just-filled');
