@@ -18,9 +18,17 @@ import {
   PATTERNS, MAX_PATTERN_QUEUE, PATTERN_QUEUE_SECTION,
   MIN_SECTION_LENGTH, MAX_SECTION_LENGTH,
   getSelectedPatternId, setSelectedPatternId,
+  getSpeedFactor, setSpeedFactor, SPEED_RANGE,
   getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
   updateQueueEntry, playPatternPreview,
 } from './audio.js';
+
+// Speed slider maps its 0-100 position to the tempo multiplier on a LOG scale,
+// so 1x sits dead center and half/double feel symmetric.
+const SPEED_MIN = SPEED_RANGE.min, SPEED_MAX = SPEED_RANGE.max;
+const posToSpeed = (pos) => SPEED_MIN * Math.pow(SPEED_MAX / SPEED_MIN, pos / 100);
+const speedToPos = (f) => Math.round(100 * Math.log(f / SPEED_MIN) / Math.log(SPEED_MAX / SPEED_MIN));
+const formatSpeed = (f) => `${Math.round(f * 100) / 100}×`;
 
 export function openSoundPicker(habits, initialHabitId, onSelected) {
   const currentScaleId = getSelectedSoundId();
@@ -58,6 +66,11 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
         <div class="sim-row">
           <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
           <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
+        </div>
+        <label class="sim-label" for="simSpeed">Speed (chain + sound tempo)</label>
+        <div class="sim-row">
+          <input type="range" id="simSpeed" min="0" max="100" step="1" value="${speedToPos(getSpeedFactor())}" />
+          <span class="sim-value" id="simSpeedValue">${formatSpeed(getSpeedFactor())}</span>
         </div>
         <label class="sim-label">Pattern (used to preview sounds)</label>
         <div class="sim-row" id="simPatternSlot"></div>
@@ -176,6 +189,8 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   const simOctaveValue = overlay.querySelector('#simOctaveValue');
   const simPitch = overlay.querySelector('#simPitch');
   const simPitchValue = overlay.querySelector('#simPitchValue');
+  const simSpeed = overlay.querySelector('#simSpeed');
+  const simSpeedValue = overlay.querySelector('#simSpeedValue');
   const queueBar = overlay.querySelector('#patternQueueBar');
   const queueCount = overlay.querySelector('#queueCount');
   const queueHabitTabs = overlay.querySelector('#queueHabitTabs');
@@ -192,6 +207,14 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     const v = setPitchShift(parseInt(simPitch.value, 10));
     simPitchValue.textContent = formatSigned(v);
   });
+
+  simSpeed.addEventListener('input', () => {
+    const f = posToSpeed(parseInt(simSpeed.value, 10));
+    setSpeedFactor(f);
+    simSpeedValue.textContent = formatSpeed(f);
+  });
+  // Audition the chain at the new tempo when the slider is released.
+  simSpeed.addEventListener('change', () => previewSim());
 
   // ----- pattern queue (per-habit) -----
 

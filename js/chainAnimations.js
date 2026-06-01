@@ -7,7 +7,7 @@
 // + today). The cascade richness scales up from there.
 
 import { todayISO, daysAgoISO, fromISO, toISO } from './utils.js';
-import { playNoteAt, playChord, playBurst } from './audio.js';
+import { playNoteAt, playChord, playBurst, getSpeedFactor } from './audio.js';
 
 // Audio policy: exactly one mallet hit per visual event.
 //   - Sequential chains: pulseCell({note: i}) fires note i at the same time
@@ -153,9 +153,10 @@ function cascadeLengthForStreak(streak) {
 //   1000 cells @ 4  ms  ~= 4 s          (clamped at floor)
 //   10000 cells @ 4 ms ~= 40 s          (genuinely epic)
 function adaptiveStep(baseMs, count) {
-  if (count <= 30) return baseMs;
-  const target = 30 * baseMs;
-  return Math.max(4, Math.floor(target / count));
+  const raw = count <= 30 ? baseMs : Math.max(4, Math.floor(30 * baseMs / count));
+  // Global tempo: >1 speeds the cascade up (shorter step), <1 slows it down.
+  // Both the visual pulse and its synced audio note ride this same step.
+  return Math.max(2, Math.round(raw / getSpeedFactor()));
 }
 
 function floaterSize(streak) {

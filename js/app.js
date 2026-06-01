@@ -32,6 +32,12 @@ function isSoundOff() {
   const v = localStorage.getItem('seinfeld_sound_scale');
   return !v || v === 'off';
 }
+// Global tempo multiplier, read straight from localStorage (audio.js is
+// lazy-loaded, so we avoid importing it here — mirrors audio.js getSpeedFactor).
+function speedFactor() {
+  const v = parseFloat(localStorage.getItem('seinfeld_sound_speed'));
+  return (Number.isFinite(v) && v > 0) ? Math.min(4, Math.max(0.25, v)) : 1;
+}
 
 const MAX_HABITS = 5;
 
@@ -624,9 +630,11 @@ const SYMPHONY_STAGGER_MS = 70;
 const SYMPHONY_BASE_STEP_MS = 65;
 const SYMPHONY_FINAL_PULSE_MS = 460;
 function symphonyStepFor(cellCount) {
-  return cellCount <= 30
+  const raw = cellCount <= 30
     ? SYMPHONY_BASE_STEP_MS
     : Math.max(4, Math.floor(30 * SYMPHONY_BASE_STEP_MS / cellCount));
+  // Keep the button beat synced with the (speed-adjusted) cascade.
+  return Math.max(2, Math.round(raw / speedFactor()));
 }
 
 async function playSymphony(btn) {

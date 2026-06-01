@@ -476,6 +476,23 @@ export function setPitchShift(n) {
 }
 export const OCTAVE_RANGE = { min: MIN_OCTAVE, max: MAX_OCTAVE };
 export const PITCH_RANGE  = { min: MIN_PITCH,  max: MAX_PITCH };
+
+// Global tempo multiplier for the chain cascade + its synced audio: >1 plays
+// faster (shorter per-step delay), <1 slower. Applied wherever per-step timing
+// is computed (adaptiveStep in chainAnimations, the symphony beat, the picker
+// preview below).
+const SPEED_STORAGE_KEY = 'seinfeld_sound_speed';
+export const SPEED_RANGE = { min: 0.25, max: 4 };
+export function getSpeedFactor() {
+  const v = parseFloat(localStorage.getItem(SPEED_STORAGE_KEY));
+  if (!Number.isFinite(v) || v <= 0) return 1;
+  return Math.min(SPEED_RANGE.max, Math.max(SPEED_RANGE.min, v));
+}
+export function setSpeedFactor(v) {
+  const f = Math.min(SPEED_RANGE.max, Math.max(SPEED_RANGE.min, v));
+  localStorage.setItem(SPEED_STORAGE_KEY, String(f));
+  return f;
+}
 // Selected scale-traversal pattern (which step to play at index i).
 export function getSelectedPatternId() {
   const saved = localStorage.getItem(PATTERN_STORAGE_KEY);
@@ -773,7 +790,7 @@ export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SE
   const c = ensureCtx();
   if (!c) return;
   const n = Math.max(1, Math.min(length, 64));
-  const stepMs = n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n));
+  const stepMs = Math.max(2, Math.round((n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n))) / getSpeedFactor()));
   const synth = scale.synth || {};
   const startSec = c.currentTime;
   const oct = getOctaveShift();
@@ -795,7 +812,7 @@ export function playSimulation(length, habitId = null) {
   const c = ensureCtx();
   if (!c) return;
   const n = Math.max(1, Math.min(length, MAX_PATTERN_QUEUE));
-  const stepMs = n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n));
+  const stepMs = Math.max(2, Math.round((n <= 30 ? 65 : Math.max(4, Math.floor(30 * 65 / n))) / getSpeedFactor()));
   const startSec = c.currentTime;
   for (let i = 0; i < n; i++) {
     const { scale, pattern, localI, octaveShift, pitchShift } = audioContextForCell(i, habitId);
