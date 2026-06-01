@@ -17,6 +17,7 @@ import {
   getPitchShift, setPitchShift, PITCH_RANGE,
   PATTERNS, MAX_PATTERN_QUEUE, PATTERN_QUEUE_SECTION,
   MIN_SECTION_LENGTH, MAX_SECTION_LENGTH,
+  getSelectedPatternId, setSelectedPatternId,
   getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
   updateQueueEntry, playPatternPreview,
 } from './audio.js';
@@ -57,6 +58,12 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
         <div class="sim-row">
           <input type="range" id="simPitch" min="${PITCH_RANGE.min}" max="${PITCH_RANGE.max}" step="1" value="${getPitchShift()}" />
           <span class="sim-value" id="simPitchValue">${formatSigned(getPitchShift())}</span>
+        </div>
+        <label class="sim-label" for="simPattern">Pattern (used to preview sounds)</label>
+        <div class="sim-row">
+          <select id="simPattern" class="sim-select">
+            ${PATTERNS.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('')}
+          </select>
         </div>
 
         <label class="sim-label">
@@ -175,6 +182,7 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   const simOctaveValue = overlay.querySelector('#simOctaveValue');
   const simPitch = overlay.querySelector('#simPitch');
   const simPitchValue = overlay.querySelector('#simPitchValue');
+  const simPattern = overlay.querySelector('#simPattern');
   const queueBar = overlay.querySelector('#patternQueueBar');
   const queueCount = overlay.querySelector('#queueCount');
   const queueHabitTabs = overlay.querySelector('#queueHabitTabs');
@@ -254,6 +262,18 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   const previewSim = () => {
     playSimulation(parseInt(simLength.value, 10), editingHabitId);
   };
+  // Preview a single SOUND with the globally selected pattern — this is what
+  // plays when you click a sound tile or change the pattern dropdown, so you
+  // actually hear the sound you picked. Distinct from previewSim(), which
+  // plays the habit's established queue/chain.
+  const previewSound = () => {
+    playPatternPreview(getSelectedPatternId(), getSelectedSoundId(), 16);
+  };
+  simPattern.value = getSelectedPatternId();
+  simPattern.addEventListener('change', () => {
+    setSelectedPatternId(simPattern.value);
+    previewSound();
+  });
 
   const renderHabitTabs = () => {
     if (realHabits.length === 0) {
@@ -619,11 +639,12 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
       grid.querySelectorAll('.sound-tile').forEach(t => t.classList.toggle('is-selected', t === tile));
       // If a pattern is currently armed for confirmation, refresh the bar
       // + re-audition the armed pattern with this new scale so the user
-      // can hear the combo they're about to commit. Otherwise, play the
-      // full queue so the scale change is audible in context.
+      // can hear the combo they're about to commit. Otherwise, preview THIS
+      // sound with the selected pattern (not the established queue) so the
+      // tile click actually auditions the sound you clicked.
       updateConfirmBar();
       if (armedPatternId) previewArmed();
-      else previewSim();
+      else previewSound();
       if (onSelected) onSelected(id);
     });
   });
