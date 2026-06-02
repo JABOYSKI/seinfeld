@@ -275,14 +275,52 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   };
   window.addEventListener('resize', onResize);
 
+  // --- preview "chunk" highlight ---------------------------------------------
+  // While a queue preview plays, highlight the chip whose section is currently
+  // sounding, so you can see which entry you're hearing. Timing mirrors
+  // playSimulation (constant stepMs); cleared when a new preview starts, a
+  // single-sound preview plays, or the picker closes.
+  let _hlTimers = [];
+  const clearPreviewHighlight = () => {
+    _hlTimers.forEach(clearTimeout);
+    _hlTimers = [];
+    queueBar.querySelectorAll('.pattern-queue-chip.is-playing').forEach(c => c.classList.remove('is-playing'));
+  };
+  const highlightChip = (idx) => {
+    queueBar.querySelectorAll('.pattern-queue-chip.is-playing').forEach(c => c.classList.remove('is-playing'));
+    const chip = queueBar.querySelector(`.pattern-queue-chip[data-index="${idx}"]`);
+    if (chip) chip.classList.add('is-playing');
+  };
+  const runPreviewHighlight = (n) => {
+    clearPreviewHighlight();
+    if (!editingHabitId) return;
+    const q = getPatternQueue(editingHabitId);
+    if (!q.length) return;
+    const lens = q.map(e => e.sectionLength || PATTERN_QUEUE_SECTION);
+    const totalCells = lens.reduce((a, b) => a + b, 0);
+    if (!totalCells) return;
+    const stepMs = Math.max(2, Math.round(65 / getSpeedFactor()));   // mirrors playSimulation
+    let lastIdx = -1;
+    for (let cell = 0; cell < n; cell++) {
+      const pos = cell % totalCells;
+      let acc = 0, idx = 0;
+      for (let k = 0; k < lens.length; k++) { if (pos < acc + lens[k]) { idx = k; break; } acc += lens[k]; }
+      if (idx !== lastIdx) { _hlTimers.push(setTimeout(() => highlightChip(idx), cell * stepMs)); lastIdx = idx; }
+    }
+    _hlTimers.push(setTimeout(clearPreviewHighlight, n * stepMs + 250));
+  };
+
   const previewSim = () => {
-    playSimulation(parseInt(simLength.value, 10), editingHabitId);
+    const n = parseInt(simLength.value, 10);
+    playSimulation(n, editingHabitId);
+    runPreviewHighlight(n);
   };
   // Preview a single SOUND with the globally selected pattern — this is what
   // plays when you click a sound tile or change the pattern dropdown, so you
   // actually hear the sound you picked. Distinct from previewSim(), which
-  // plays the habit's established queue/chain.
+  // plays the habit's established queue/chain (and highlights its chunks).
   const previewSound = () => {
+    clearPreviewHighlight();
     playPatternPreview(getSelectedPatternId(), getSelectedSoundId(), 16);
   };
   // Debounce slider-driven previews so dragging a chip-editor slider fires ONE
@@ -435,6 +473,7 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
 
   const previewArmed = () => {
     if (!armedPatternId) return;
+    clearPreviewHighlight();
     playPatternPreview(armedPatternId, getSelectedSoundId(), PATTERN_QUEUE_SECTION);
   };
   const armPattern = (id) => {
@@ -686,6 +725,7 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
 
   const close = () => {
     stopPreview();
+    clearPreviewHighlight();
     if (_previewTimer) clearTimeout(_previewTimer);
     window.removeEventListener('resize', onResize);
     overlay.remove();

@@ -924,6 +924,12 @@ button { font: inherit; color: inherit; }
 .pattern-queue-chip.is-editing {
   box-shadow: 0 0 0 2px var(--accent-text), 0 0 0 4px var(--accent);
 }
+/* The chip whose section is currently sounding during a preview. */
+.pattern-queue-chip.is-playing {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 0 0 2px var(--accent-text), 0 0 16px 3px color-mix(in srgb, var(--accent) 65%, #fff);
+  filter: brightness(1.12);
+}
 .chip-num {
   display: inline-flex;
   align-items: center;
