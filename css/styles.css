@@ -550,12 +550,14 @@ button { font: inherit; color: inherit; }
   background: transparent;
   border-color: transparent;
   cursor: default;
-  overflow: hidden;
+  /* No overflow:hidden here — it would clip the "+N" chain floater that floats
+     up out of the cell. The slice clipping lives on .day-slices instead. */
 }
 .day-slices {
   position: absolute; inset: 0;
   display: flex;
   border-radius: inherit;
+  overflow: hidden;   /* clip the colored slices to the rounded cell */
   pointer-events: none;
 }
 .day-slice {
