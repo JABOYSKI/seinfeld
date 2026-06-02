@@ -21,6 +21,26 @@ function ensureCtx() {
   return ctx;
 }
 
+// All sound-picker PREVIEW audio routes through a dedicated bus so a new
+// preview can instantly silence the previous one — only ONE preview ever
+// sounds at a time, even while dragging a slider. Real chain/symphony audio
+// goes straight to masterGain and is never cut by a preview.
+let previewBus = null;
+function previewOut() {
+  const c = ensureCtx();
+  if (!c) return masterGain;
+  if (!previewBus) { previewBus = c.createGain(); previewBus.connect(masterGain); }
+  return previewBus;
+}
+export function stopPreview() {
+  if (previewBus) {
+    // Disconnecting the bus mutes every in-flight preview note instantly; the
+    // next preview builds a fresh bus.
+    try { previewBus.disconnect(); } catch (e) {}
+    previewBus = null;
+  }
+}
+
 // 10 scales of single-octave-ish ascending pitches in Hz. The cascade index
 // indexes into the array; we clamp to the last note for chains longer than
 // the scale.
@@ -634,15 +654,17 @@ function playMalletNote(freq, opts = {}) {
   } = opts;
   const t = c.currentTime + when;
 
-  // Build a per-note signal chain. Filter goes between the env and master
-  // when requested; otherwise we go straight to master.
+  // Build a per-note signal chain. `out` lets previews route through the
+  // preview bus (so they can be cut as a group); default is masterGain. Filter
+  // goes between the env and the output when requested.
+  const out = opts.out || masterGain;
   const sink = filter ? (() => {
     const f = c.createBiquadFilter();
     f.type = 'lowpass';
     f.frequency.value = filter;
-    f.connect(masterGain);
+    f.connect(out);
     return f;
-  })() : masterGain;
+  })() : out;
 
   const osc1 = c.createOscillator();
   osc1.type = type;
@@ -799,8 +821,10 @@ export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SE
   const pattern = PATTERNS.find(p => p.id === patternId);
   const scale = SCALES.find(s => s.id === scaleId);
   if (!pattern || !scale || !scale.notes) return;
+  stopPreview();
   const c = ensureCtx();
   if (!c) return;
+  const out = previewOut();
   const n = Math.max(1, Math.min(length, 64));
   const stepMs = Math.max(2, Math.round(65 / getSpeedFactor()));
   const synth = scale.synth || {};
@@ -810,7 +834,7 @@ export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SE
   for (let i = 0; i < n; i++) {
     const gain = 0.4 + Math.min(i, 20) * 0.008;
     playMalletNote(freqAtWith(scale, pattern, i, oct, pit), {
-      ...synth, gain,
+      ...synth, gain, out,
       when: (startSec - c.currentTime) + (i * stepMs) / 1000,
     });
   }
@@ -821,8 +845,10 @@ export function playPatternPreview(patternId, scaleId, length = PATTERN_QUEUE_SE
 // the global default if no habit context is provided). Timing mirrors the
 // chain animation's adaptiveStep.
 export function playSimulation(length, habitId = null) {
+  stopPreview();
   const c = ensureCtx();
   if (!c) return;
+  const out = previewOut();
   const n = Math.max(1, Math.min(length, MAX_PATTERN_QUEUE));
   const stepMs = Math.max(2, Math.round(65 / getSpeedFactor()));
   const startSec = c.currentTime;
@@ -834,6 +860,7 @@ export function playSimulation(length, habitId = null) {
     playMalletNote(freqAtWith(scale, pattern, localI, octaveShift, pitchShift), {
       ...synth,
       gain,
+      out,
       when: (startSec - c.currentTime) + (i * stepMs) / 1000,
     });
   }

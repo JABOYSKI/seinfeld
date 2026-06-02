@@ -20,7 +20,7 @@ import {
   getSelectedPatternId, setSelectedPatternId,
   getSpeedFactor, setSpeedFactor, SPEED_RANGE,
   getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
-  updateQueueEntry, playPatternPreview,
+  updateQueueEntry, playPatternPreview, stopPreview,
 } from './audio.js';
 
 // Speed slider maps its 0-100 position to the tempo multiplier on a LOG scale,
@@ -284,6 +284,14 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   // plays the habit's established queue/chain.
   const previewSound = () => {
     playPatternPreview(getSelectedPatternId(), getSelectedSoundId(), 16);
+  };
+  // Debounce slider-driven previews so dragging a chip-editor slider fires ONE
+  // preview once it settles, not one per input tick. (stopPreview in audio.js
+  // also guarantees only one preview is ever audible at a time.)
+  let _previewTimer = null;
+  const previewSimDebounced = () => {
+    if (_previewTimer) clearTimeout(_previewTimer);
+    _previewTimer = setTimeout(() => { _previewTimer = null; previewSim(); }, 130);
   };
   // Pattern picker shown as a sparkline dropdown (native <select> can't hold
   // the dot-matrix SVG). Selecting a pattern sets the global preview pattern
@@ -589,7 +597,7 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     // re-mark editing chip (renderQueueChips wipes classes)
     const chip = queueBar.querySelector(`.pattern-queue-chip[data-index="${editingChipIndex}"]`);
     if (chip) chip.classList.add('is-editing');
-    previewSim();
+    previewSimDebounced();
   };
 
   ceOctave.addEventListener('input', () => {
@@ -677,6 +685,8 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
   });
 
   const close = () => {
+    stopPreview();
+    if (_previewTimer) clearTimeout(_previewTimer);
     window.removeEventListener('resize', onResize);
     overlay.remove();
   };
