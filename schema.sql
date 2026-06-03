@@ -6,7 +6,9 @@
 -- reference public.users and so we can add profile columns later).
 create table if not exists public.users (
   id uuid primary key references auth.users on delete cascade,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  sound_settings jsonb   -- per-account sound config (scale/octave/pitch/pattern/
+                         -- speed + per-habit queues), synced across devices
 );
 
 create table if not exists public.habits (

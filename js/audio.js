@@ -2,6 +2,7 @@
 // Web Audio API — no audio files to host. Lazy-initialized on first use to
 // comply with browser autoplay policies (an AudioContext created or resumed
 // after a user gesture is allowed; before a gesture it's blocked).
+import { scheduleSaveSoundSettings } from './soundStore.js';
 
 let ctx = null;
 let masterGain = null;
@@ -469,6 +470,7 @@ export function getSelectedSoundId() {
 export function setSelectedSoundId(id) {
   if (!VALID_IDS.has(id)) return false;
   localStorage.setItem(STORAGE_KEY, id);
+  scheduleSaveSoundSettings();
   return true;
 }
 // Octave shift (integer) — multiplies every note frequency by 2^shift.
@@ -480,6 +482,7 @@ export function getOctaveShift() {
 export function setOctaveShift(n) {
   const v = Math.max(MIN_OCTAVE, Math.min(MAX_OCTAVE, Math.round(n)));
   localStorage.setItem(OCTAVE_STORAGE_KEY, String(v));
+  scheduleSaveSoundSettings();
   return v;
 }
 // Pitch shift (semitones, integer) — finer than octave shift. Stacks with
@@ -492,6 +495,7 @@ export function getPitchShift() {
 export function setPitchShift(n) {
   const v = Math.max(MIN_PITCH, Math.min(MAX_PITCH, Math.round(n)));
   localStorage.setItem(PITCH_STORAGE_KEY, String(v));
+  scheduleSaveSoundSettings();
   return v;
 }
 export const OCTAVE_RANGE = { min: MIN_OCTAVE, max: MAX_OCTAVE };
@@ -511,6 +515,7 @@ export function getSpeedFactor() {
 export function setSpeedFactor(v) {
   const f = Math.min(SPEED_RANGE.max, Math.max(SPEED_RANGE.min, v));
   localStorage.setItem(SPEED_STORAGE_KEY, String(f));
+  scheduleSaveSoundSettings();
   return f;
 }
 // Selected scale-traversal pattern (which step to play at index i).
@@ -521,6 +526,7 @@ export function getSelectedPatternId() {
 export function setSelectedPatternId(id) {
   if (!VALID_PATTERN_IDS.has(id)) return false;
   localStorage.setItem(PATTERN_STORAGE_KEY, id);
+  scheduleSaveSoundSettings();
   return true;
 }
 export function getCurrentPattern() {
@@ -541,6 +547,7 @@ function readQueuesMap() {
 }
 function writeQueuesMap(map) {
   localStorage.setItem(PATTERN_QUEUES_STORAGE_KEY, JSON.stringify(map));
+  scheduleSaveSoundSettings();   // covers add/remove/update/clear queue mutations
 }
 // Normalize a queue entry into the canonical
 // {pattern, scale, octaveShift?, pitchShift?, sectionLength?} shape.

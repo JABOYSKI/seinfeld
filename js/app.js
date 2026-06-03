@@ -1,5 +1,6 @@
 // Main controller — boots, routes auth vs tracker, owns app state.
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
+import { syncSoundSettingsOnBoot } from './soundStore.js';
 import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS, DEFAULT_TEXT_COLOR, normalizeTextColor, migrationFileForColumn } from './habits.js';
 import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 import { buildColorWheel } from './colorWheel.js';
@@ -197,6 +198,11 @@ async function showTracker() {
   els.authMount.hidden = true;
   els.app.hidden = false;
   renderShell();
+  // Pull this account's sound settings into localStorage so they're identical
+  // across devices. Fire-and-forget: it doesn't block the calendar render and
+  // completes well before the user triggers any sound.
+  const u = getUser();
+  if (u) syncSoundSettingsOnBoot(u.id);
   await loadAndRenderHabits();
 }
 
