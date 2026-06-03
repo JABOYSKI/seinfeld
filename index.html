@@ -51,28 +51,18 @@
 
   <script type="module" src="js/app.js?v=2026-06-03T07:53:00Z"></script>
 
-  <!-- Service worker (PWA / offline shell). Failure is non-fatal. -->
+  <!-- Service worker (PWA / offline shell). Failure is non-fatal.
+       The reload-on-update is handled inside sw.js (clients.navigate on
+       activate) so it works even for tabs whose JS is stale — that's what
+       breaks a browser out of a stuck/old service worker. -->
   <script>
     if ('serviceWorker' in navigator) {
-      // If a controller already exists at load, this tab is an UPDATE candidate:
-      // when a freshly-deployed SW activates and claims the page, reload once so
-      // the open tab runs the new assets instead of stale in-memory modules.
-      // (Guarded so the first-ever install — controller goes null->set — and
-      // repeat fires don't trigger a reload loop.)
-      if (navigator.serviceWorker.controller) {
-        var swReloaded = false;
-        navigator.serviceWorker.addEventListener('controllerchange', function () {
-          if (swReloaded) return;
-          swReloaded = true;
-          window.location.reload();
-        });
-      }
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('sw.js').then(function (reg) {
-          // Proactively check for a freshly-deployed SW so an already-open tab
-          // picks up new code without a manual hard-reload: check whenever the
-          // tab regains focus, and on a slow heartbeat. When a new SW activates
-          // it claims the page -> controllerchange (above) -> one reload.
+        // updateViaCache:'none' -> the browser NEVER serves sw.js from the HTTP
+        // cache when checking for updates, so a fresh deploy is detected promptly.
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(function (reg) {
+          // Proactively poll for a freshly-deployed SW so an already-open tab
+          // updates without a manual reload: on focus + a slow heartbeat.
           var check = function () { reg.update().catch(function(){}); };
           document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'visible') check();

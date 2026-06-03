@@ -40,11 +40,20 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    const old = keys.filter(k => k !== CACHE);
+    await Promise.all(old.map(k => caches.delete(k)));
+    await self.clients.claim();
+    // If a previous cache existed, this activation is an UPDATE (not a first
+    // install) — force every open tab to reload onto the fresh assets. Doing
+    // this from the SW means it works even for tabs whose page JS predates the
+    // reload logic, which is what gets a browser unstuck from a stale SW.
+    if (old.length > 0) {
+      const wins = await self.clients.matchAll({ type: 'window' });
+      for (const c of wins) { try { c.navigate(c.url); } catch (err) { /* ignore */ } }
+    }
+  })());
 });
 
 self.addEventListener('fetch', (e) => {
