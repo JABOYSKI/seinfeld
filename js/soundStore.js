@@ -50,10 +50,12 @@ function localHasContent() {
 
 async function pushNow(userId) {
   try {
-    await withTimeout(
+    const { error } = await withTimeout(
       supabase.from('users').update({ sound_settings: readLocalBlob() }).eq('id', userId),
       8000, 'saveSoundSettings');
-  } catch (e) { /* non-fatal: column missing / offline */ }
+    if (error) throw error;
+    return true;
+  } catch (e) { return false; /* column missing / offline */ }
 }
 
 // Boot sync: pull this account's cloud settings into localStorage so the audio
@@ -89,4 +91,14 @@ export function scheduleSaveSoundSettings() {
   const userId = u.id;
   if (_timer) clearTimeout(_timer);
   _timer = setTimeout(() => { _timer = null; pushNow(userId); }, 1500);
+}
+
+// Explicit "Save to account": flush immediately (cancel the pending debounce)
+// and report whether it landed, so the UI can confirm. Returns false if offline,
+// not signed in, or the column doesn't exist yet (migration 005 not run).
+export async function saveSoundSettingsNow() {
+  if (_timer) { clearTimeout(_timer); _timer = null; }
+  const u = getUser();
+  if (!u || !u.id) return false;
+  return pushNow(u.id);
 }

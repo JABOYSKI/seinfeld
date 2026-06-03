@@ -22,6 +22,7 @@ import {
   getPatternQueue, addToPatternQueue, removeFromPatternQueue, clearPatternQueue,
   updateQueueEntry, playPatternPreview, stopPreview,
 } from './audio.js';
+import { saveSoundSettingsNow } from './soundStore.js';
 
 // Speed slider maps its 0-100 position to the tempo multiplier on a LOG scale,
 // so 1x sits dead center and half/double feel symmetric.
@@ -175,6 +176,7 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
       </div>
       <div class="dlg-actions">
         <div class="header-spacer"></div>
+        <button class="btn btn-primary" id="soundPickerSave">Save to account</button>
         <button class="btn" id="soundPickerClose">Close</button>
       </div>
     </div>
@@ -730,6 +732,15 @@ export function openSoundPicker(habits, initialHabitId, onSelected) {
     window.removeEventListener('resize', onResize);
     overlay.remove();
   };
+  const saveBtn = overlay.querySelector('#soundPickerSave');
+  saveBtn.addEventListener('click', async () => {
+    saveBtn.disabled = true;
+    const orig = saveBtn.textContent;
+    saveBtn.textContent = 'Saving…';
+    const ok = await saveSoundSettingsNow();
+    saveBtn.textContent = ok ? 'Saved ✓' : "Couldn't save";
+    setTimeout(() => { saveBtn.textContent = orig; saveBtn.disabled = false; }, ok ? 1400 : 2200);
+  });
   overlay.querySelector('#soundPickerClose').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
