@@ -141,6 +141,7 @@ button { font: inherit; color: inherit; }
 
 .icon-btn {
   width: 36px; height: 36px;
+  flex-shrink: 0;   /* keep square — don't let a tight mobile header squish it */
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--card);
@@ -264,11 +265,17 @@ button { font: inherit; color: inherit; }
 .logo {
   font-weight: 900; font-size: 20px;
   display: inline-flex; align-items: center; gap: 8px;
+  min-width: 0;   /* let the logo absorb a tight header (its text truncates)
+                     while the fixed-size controls keep their shape */
 }
 .logo-text {
   color: var(--text);
   text-transform: uppercase;
   letter-spacing: 2.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .header-spacer { flex: 1; }
 
@@ -765,6 +772,7 @@ button { font: inherit; color: inherit; }
   justify-content: center;
   width: 40px;
   height: 40px;
+  flex-shrink: 0;   /* keep the circle 40x40 — don't let a tight mobile row squish it */
   padding: 0;
   margin-left: 6px;
   color: var(--accent-text);
