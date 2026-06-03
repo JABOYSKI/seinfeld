@@ -1,6 +1,7 @@
 // Main controller — boots, routes auth vs tracker, owns app state.
 import { initAuth, onAuthChange, signOut, renderAuth, getUser } from './auth.js';
 import { syncSoundSettingsOnBoot } from './soundStore.js';
+import { initInstallPrompt } from './install.js';
 import { loadHabits, createHabit, updateHabit, deleteHabit, repairFutureCreatedDates, COLORS, DEFAULT_TEXT_COLOR, normalizeTextColor, migrationFileForColumn } from './habits.js';
 import { TEXTURES, DEFAULT_TEXTURE_ID, normalizeTexture } from './textures.js';
 import { buildColorWheel } from './colorWheel.js';
@@ -171,6 +172,7 @@ async function boot() {
 
     if (user) await showTracker();
     else showAuth();
+    initInstallPrompt();   // offer to install as a home-screen app (dismissible)
   } catch (err) {
     console.error('Boot failed:', err);
     toast(`Boot failed: ${err.message || err}`, 'error');

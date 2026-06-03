@@ -51,6 +51,17 @@
 
   <script type="module" src="js/app.js?v=2026-06-03T08:08:15Z"></script>
 
+  <!-- Capture the PWA install event early — Chromium fires beforeinstallprompt
+       before the app module finishes loading, so stash it here for install.js. -->
+  <script>
+    window.__installPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__installPrompt = e;
+      window.dispatchEvent(new Event('seinfeld:installable'));
+    });
+  </script>
+
   <!-- Service worker (PWA / offline shell). Failure is non-fatal.
        The reload-on-update is handled inside sw.js (clients.navigate on
        activate) so it works even for tabs whose JS is stale — that's what
